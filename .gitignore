@@ -1,0 +1,8 @@
+debug/
+release/
+cxxtoc
+*.cbp
+*.save
+*.layout
+test
+*.xml
