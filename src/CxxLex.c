@@ -139,6 +139,10 @@
 					// Starting with 'i' can be if,inline,int.
 					type=CXX_TOKEN_IF;
 					break;
+				case 'l':
+					// starting with l is only 'long'.
+					type=CXX_TOKEN_LONG;
+					break;
 				case 'p':
 					// Starting with 'p' can be private,protected,public
 					type=CXX_TOKEN_PUBLIC;
@@ -275,6 +279,15 @@
 										}
 										break;
 								}
+						}
+					}
+					goto jmp_IT_WAS_IDENTIFIER;
+				// long
+				case CXX_TOKEN_LONG:
+					if(source->bufferpoint+4<source->bufferlen && source->buffer[source->bufferpoint++]=='o' && source->buffer[source->bufferpoint++]=='n' && source->buffer[source->bufferpoint++]=='g'){
+						switch(source->buffer[source->bufferpoint]){
+              STOP_CASE
+								goto jmp_OUT_OF_READING_WHILE;
 						}
 					}
 					goto jmp_IT_WAS_IDENTIFIER;
@@ -621,34 +634,58 @@
 		ite->childlen=0;
 		ite->token=0;
 		ite->childrenoldest=0;
+		// This may not be evident but putting memory location of the oldest child
+		// to be youngest child makes so that pointer to new yougest child can be
+		// added without if else clause checking is yougestchild null.
+		// Negative for this in double linked list system is that memory location of
+		// pointer to oldest child is a ending marker when going through the children backwards.
 		ite->childrenyougest=(CxxAbstractSyntaxTreeNode*)&ite->childrenoldest;
 
 		// Lex the file to create abstract syntax tree.
 		while((token=cxxLexGetNext(source))){
 
-			{
-				// Allocate next child
-				CxxAbstractSyntaxTreeNode *newchild=malloc(sizeof(CxxAbstractSyntaxTreeNode));
-				ite->childrenyougest->siblingsyounger=newchild;
-				newchild->siblingsolder=ite->childrenyougest;
-				ite->childlen++;
-				ite->childrenyougest=newchild;
-				newchild->parent=ite;
-				newchild->childlen=0;
-				newchild->childrenoldest=0;
-				newchild->childrenyougest=(CxxAbstractSyntaxTreeNode*)&newchild->childrenoldest;
-				newchild->siblingsyounger=0;
-				newchild->token=token;
+			switch(token->element)
+				case CXX_TOKEN_STRUCTURE:
+					CxxAbstractSyntaxTreeNode *newchild=malloc(sizeof(CxxAbstractSyntaxTreeNode));
+					ite->childrenyougest->siblingsyounger=newchild;
+					newchild->siblingsolder=ite->childrenyougest;
+					ite->childlen++;
+					ite->childrenyougest=newchild;
+					newchild->parent=ite;
+					newchild->childlen=0;
+					newchild->childrenoldest=0;
+					newchild->childrenyougest=(CxxAbstractSyntaxTreeNode*)&newchild->childrenoldest;
+					newchild->siblingsyounger=0;
+					newchild->token=token;
+					if((token=cxxLexGetNext(source))==CXX_TOKEN_){
+            ;
+					}
+					break;
+				default:
+				{
+					// Allocate next child
+					CxxAbstractSyntaxTreeNode *newchild=malloc(sizeof(CxxAbstractSyntaxTreeNode));
+					ite->childrenyougest->siblingsyounger=newchild;
+					newchild->siblingsolder=ite->childrenyougest;
+					ite->childlen++;
+					ite->childrenyougest=newchild;
+					newchild->parent=ite;
+					newchild->childlen=0;
+					newchild->childrenoldest=0;
+					newchild->childrenyougest=(CxxAbstractSyntaxTreeNode*)&newchild->childrenoldest;
+					newchild->siblingsyounger=0;
+					newchild->token=token;
 
-				// Move to child.
-				ite=newchild;
-			}
-			{
-				uint32_t tokenstrlen;
-				char *tokenstr=tokenTypeToStr(token,&tokenstrlen);
-				printStrCat(STDOUT_FILENO,tokenstr," :\n",tokenstrlen,3);
-				printStrCat(STDOUT_FILENO,token->characters,"\n",token->len,1);
-			}
+					// Move to child.
+					ite=newchild;
+				}
+				{
+//				uint32_t tokenstrlen;
+//
+//				char *tokenstr=tokenTypeToStr(token,&tokenstrlen);
+//				printStrCat(STDOUT_FILENO,tokenstr," :\n",tokenstrlen,3);
+//				printStrCat(STDOUT_FILENO,token->characters,"\n",token->len,1);
+				}
 		}
 		return CXX_SYNTAX_GOOD;
 	}
@@ -808,6 +845,9 @@
 			case CXX_TOKEN_INT:
 				*len=sizeof("CXX_TOKEN_INT")-1;
 				return "CXX_TOKEN_INT";
+			case CXX_TOKEN_LONG:
+				*len=sizeof("CXX_TOKEN_LONG")-1;
+				return "CXX_TOKEN_LONG";
 			case CXX_TOKEN_PRIVATE:
 				*len=sizeof("CXX_TOKEN_PRIVATE")-1;
 				return "CXX_TOKEN_PRIVATE";

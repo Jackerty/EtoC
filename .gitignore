@@ -6,3 +6,4 @@ cxxtoc
 *.layout
 test
 *.xml
+*.depend

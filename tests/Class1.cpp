@@ -210,7 +210,7 @@ struct Depoyment
 {
 	int pos;
 	int wave;
-	UnitAI* unit;
+	//UnitAI* unit;
 };
 
 class Commander
@@ -224,25 +224,30 @@ public:
 	int update_towers();
 	virtual void recrute_soldiers();
 	virtual Depoyment** deploy();
-	virtual UnitAI** get_towers();
-	virtual UnitAI** get_soldiers();
+	//virtual UnitAI** get_towers();
+	//virtual UnitAI** get_soldiers();
 	void recieve_funds(int funds);
-	bool salary_paid(UnitAI* u);
+	//bool salary_paid(UnitAI* u);
 
 protected:
 	int id;
-	UnitAI* towers;
-	UnitAI* army;
+	//UnitAI* towers;
+	//UnitAI* army;
 	long money;
 private:
 
 
 };
 
+class Comm{int j;};
+
 int main(){
+	struct Comm comm;
+  printf("%d\n",comm.j);
 
 	char inputbuffer[BUFFER_IO_SIZE];
-	inputpoint=0;
+	int inputpoint=0;
+	int n;
 	while((n=read(STDIN_FILENO,inputbuffer,BUFFER_IO_SIZE))>0){
 		switch(inputbuffer[inputpoint]){
 		case '1':
