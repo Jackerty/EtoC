@@ -29,26 +29,33 @@
 	*****************/
 	CxxToken *cxxLexGetNext(EtocSource *source){
 
-		// Pointer to element which will be returned if found.
-		// Otherwise return null.
-		CxxToken *element=0;
-    register enum CxxTokenType type;
-    register uint16_t numnewlines;
+		// Basic information to make any token.
+    CxxTokenType type;
+    uint16_t numnewlines;
+    uint32_t start;
+		// This is temporary holder of a character.
+		// Mostly used to grab character from the buffer
+		// when if sentence has multiple uses of same buffer point.
+		char character;
+
 		// If source code doesn't have anything interesting
 		// jump back here.
     jmp_CONTINUE_OUTHER:
-    if(source->bufferpoint<source->bufferlen){
+		if(source->bufferpoint<source->bufferlen){
 			switch(source->buffer[source->bufferpoint]){
 				//** SPACE OR TAB  **//
 				// Just ignore in this level
 				case '\n':
 					numnewlines++;
 				case '\r':
-				case ' ':
+				case  ' ':
 				case '\t':
 					source->bufferpoint++;
 					goto jmp_CONTINUE_OUTHER;
+			}
+			start=source->bufferpoint;
 
+			switch(source->buffer[source->bufferpoint]){
 				//** PREPROCESSING SYMBOL **//
 				case '#':
 					type=CXX_TOKEN_PREPROCESS_DEFINTION;
@@ -119,15 +126,32 @@
 					break;
 				//** KEYWORDS **//
 				// List find https://en.cppreference.com/w/cpp/keyword
-        //
+				//
 				// Starting with 'a' can be alignas, alignof, and, and_eq, asm, auto.
 				// We use
 				case 'a':
 					type=CXX_TOKEN_AND;
+					goto jmp_IT_WAS_IDENTIFIER;
 					break;
 				case 'b':
 					// Starting with 'b' can be bitand, bitor, bool, break.
-					type=CXX_TOKEN_BOOL;
+					if(source->bufferpoint<source->bufferlen){
+						switch(source->buffer[source->bufferpoint]){
+							// Is it bool?
+							case 'o':
+								if((++source->bufferpoint)+1<source->bufferlen){
+									if(source->buffer[source->bufferpoint++]=='o' && source->buffer[source->bufferpoint++]=='l'){
+										switch(source->buffer[source->bufferpoint]){
+											type=CXX_TOKEN_BOOL;
+											STOP_CASE
+												goto jmp_OUT_OF_READING_WHILE;
+										}
+									}
+								}
+								break;
+						}
+					}
+					goto jmp_IT_WAS_IDENTIFIER;
 					break;
 				case 'c':
 					// Starting with 'c' can be case,catch,char,char8_t,char16_t,char32_t,class,
@@ -150,8 +174,8 @@
 				case 's':
 					// Starting with 's' can be short signed,sizeof,static,static_assert,
 					// static_cast,struct,switch,synchronized.
-          type=CXX_TOKEN_STATIC;
-          break;
+					type=CXX_TOKEN_STATIC;
+					break;
 				case 't':
 					// Starting with 't' can be template, this, thread_local, throw, true, try,
 					// typedef, typeid, typename.
@@ -168,15 +192,7 @@
 
 			}
 
-			element=malloc(sizeof(CxxToken));
-			element->type=type;
-			element->characters=source->buffer+source->bufferpoint;
-			element->numnewlines=numnewlines;
-
-			register uint32_t start=source->bufferpoint;
 			source->bufferpoint++;
-
-			register char character;
 
 			// We will disable case warning not all enumeration have
 			// case. We don't have case for everything because for
@@ -185,25 +201,6 @@
 			#pragma GCC diagnostic ignored "-Wswitch"
 
 			switch(type){
-				case CXX_TOKEN_AND:
-					goto jmp_IT_WAS_IDENTIFIER;
-				case CXX_TOKEN_BOOL:
-					if(source->bufferpoint<source->bufferlen){
-						switch(source->buffer[source->bufferpoint]){
-							// Is it bool?
-							case 'o':
-								if((++source->bufferpoint)+1<source->bufferlen){
-									if(source->buffer[source->bufferpoint++]=='o' && source->buffer[source->bufferpoint++]=='l'){
-										switch(source->buffer[source->bufferpoint]){
-											STOP_CASE
-												goto jmp_OUT_OF_READING_WHILE;
-										}
-									}
-								}
-								break;
-						}
-					}
-					goto jmp_IT_WAS_IDENTIFIER;
 				// Keywords:
 				// case,catch,char,char8_t,char16_t,char32_t,class,compl,
 				// concept,const,consteval,constexpr,const_cast,continue,
@@ -218,7 +215,7 @@
 										if((++source->bufferpoint)<source->bufferlen){
 											switch(source->buffer[source->bufferpoint]){
 												STOP_CASE
-													element->type=CXX_TOKEN_CHAR;
+													type=CXX_TOKEN_CHAR;
 													goto jmp_OUT_OF_READING_WHILE;
 											}
 										}
@@ -273,7 +270,7 @@
 												case  ' ':
 												case '\t':
 												case  '>':
-													element->type=CXX_TOKEN_INT;
+													type=CXX_TOKEN_INT;
 													goto jmp_OUT_OF_READING_WHILE;
 											}
 										}
@@ -286,7 +283,7 @@
 				case CXX_TOKEN_LONG:
 					if(source->bufferpoint+4<source->bufferlen && source->buffer[source->bufferpoint++]=='o' && source->buffer[source->bufferpoint++]=='n' && source->buffer[source->bufferpoint++]=='g'){
 						switch(source->buffer[source->bufferpoint]){
-              STOP_CASE
+							STOP_CASE
 								goto jmp_OUT_OF_READING_WHILE;
 						}
 					}
@@ -294,11 +291,11 @@
 				// short signed,sizeof,static,static_assert,
 				// static_cast,struct,switch,synchronized
 				case CXX_TOKEN_STATIC:
-          if(source->bufferpoint<source->bufferlen){
+					if(source->bufferpoint<source->bufferlen){
 						switch(source->buffer[source->bufferpoint]){
 							// Is it a static or struct?
 							case 't':
-                if(++source->bufferpoint<source->bufferlen){
+								if(++source->bufferpoint<source->bufferlen){
 									switch(source->buffer[source->bufferpoint]){
 										// Is it struct?
 										case 'r':
@@ -310,7 +307,7 @@
 														case  ' ':
 														case '\t':
 														case  '{':
-															element->type=CXX_TOKEN_STRUCTURE;
+															type=CXX_TOKEN_STRUCTURE;
 															goto jmp_OUT_OF_READING_WHILE;
 													}
 												}
@@ -320,11 +317,11 @@
 										case 'a':
 											break;
 									}
-                }
+								}
 
 								break;
 						}
-          }
+					}
 					goto jmp_IT_WAS_IDENTIFIER;
 
 				// private,protected,public
@@ -376,7 +373,7 @@
 															case  ' ':
 															case '\t':
 															case  '{':
-																element->type=CXX_TOKEN_TYPEDEF;
+																type=CXX_TOKEN_TYPEDEF;
 																goto jmp_OUT_OF_READING_WHILE;
 														}
 													}
@@ -390,14 +387,14 @@
 									}
 								}
 								break;
- 						}
+						}
 					}
 					goto jmp_IT_WAS_IDENTIFIER;
 					// We jump here if it is realized that
 					// what we where reading was identifier
 					// rather then keyword.
 					jmp_IT_WAS_IDENTIFIER:
-					element->type=CXX_TOKEN_IDENTIFIER;
+					type=CXX_TOKEN_IDENTIFIER;
 				// Read until ending identifier comes.
 				case CXX_TOKEN_IDENTIFIER:
 					while(source->bufferpoint<source->bufferlen){
@@ -436,7 +433,7 @@
 									case '\n':
 									case ';':
 									case '\t':
-										element->type=CXX_TOKEN_NUMBER_OCTAL;
+										type=CXX_TOKEN_NUMBER_OCTAL;
 										goto jmp_OUT_OF_READING_WHILE;
 									default:
 										goto jmp_ERROR_EXIT;
@@ -478,7 +475,7 @@
 										case '\n':
 										case ';':
 										case '\t':
-											element->type=CXX_TOKEN_NUMBER_BIN;
+											type=CXX_TOKEN_NUMBER_BIN;
 											goto jmp_OUT_OF_READING_WHILE;
 										default:
 											goto jmp_ERROR_EXIT;
@@ -487,9 +484,9 @@
 								source->bufferpoint++;
 							}
 					}
-          // There seem to be chance it is just zero
-          // which means that we have to check for ending.
-          element->type=CXX_TOKEN_NUMBER_DEC;
+					// There seem to be chance it is just zero
+					// which means that we have to check for ending.
+					type=CXX_TOKEN_NUMBER_DEC;
 					goto jmp_FAST_SWITCH_CASE;
 
 					// Handle decimal number
@@ -512,17 +509,17 @@
 
 				// Read until string ending comes.
 				case CXX_TOKEN_STRING:
-          while(source->bufferpoint<source->bufferlen){
-            if(source->buffer[source->bufferpoint++]=='"') goto jmp_OUT_OF_READING_WHILE;
-          }
-          goto jmp_ERROR_EXIT;
+					while(source->bufferpoint<source->bufferlen){
+						if(source->buffer[source->bufferpoint++]=='"') goto jmp_OUT_OF_READING_WHILE;
+					}
+					goto jmp_ERROR_EXIT;
 
 				// Read until character ending comes.
 				case CXX_TOKEN_CHARACTER:
-          while(source->bufferpoint<source->bufferlen){
-            if(source->buffer[source->bufferpoint++]=='\'') goto jmp_OUT_OF_READING_WHILE;
-          }
-          goto jmp_ERROR_EXIT;
+					while(source->bufferpoint<source->bufferlen){
+						if(source->buffer[source->bufferpoint++]=='\'') goto jmp_OUT_OF_READING_WHILE;
+					}
+					goto jmp_ERROR_EXIT;
 
 				// Based upon which type of comment ether wait for line end
 				// or wait */ marker.
@@ -558,10 +555,10 @@
 													const char includetest[]={'c','l','u','d','e'};
 													if(strncmp(source->buffer+source->bufferpoint,includetest,sizeof(includetest))==0){
 														source->bufferpoint+=5;
-														element->type=CXX_TOKEN_INCLUDE;
+														type=CXX_TOKEN_INCLUDE;
 														while(source->bufferpoint<source->bufferlen
-														      && ((character=source->buffer[source->bufferpoint++])==' '
-														      || character=='\t')
+																	&& ((character=source->buffer[source->bufferpoint++])==' '
+																	|| character=='\t')
 														);
 														switch(character){
 															case '<':
@@ -583,11 +580,10 @@
 									case 'd':
 										// Check that define is
 										if(source->bufferpoint+5<source->bufferlen){
-											element->len+=5;
 											const char definetest[]={'e','f','i','n','e'};
 											if(strncmp(source->buffer+source->bufferpoint,definetest,sizeof(definetest))==0){
 												source->bufferpoint+=sizeof(definetest);
-                        goto jmp_OUT_OF_READING_WHILE;
+												goto jmp_OUT_OF_READING_WHILE;
 											}
 										}
 										goto jmp_ERROR_EXIT;
@@ -600,28 +596,68 @@
 						}
 					}
 					goto jmp_ERROR_EXIT;
-					break;
 			}
 			#pragma GCC diagnostic pop
 			// Previous switch statement may have more nested
 			// switches or loops preventing us just breaking out.
-			jmp_OUT_OF_READING_WHILE:
+			jmp_OUT_OF_READING_WHILE:;
 
-			// It faster to calculate elements length here.
+			// Pointer to element which will be returned if found.
+			CxxToken *element=malloc(sizeof(CxxToken));
+			element->type=type;
+			element->characters=source->buffer+start;
+			element->numnewlines=numnewlines;
+
+			// It is faster to calculate elements length here.
 			element->len=source->bufferpoint-start;
 			return element;
 		}
 
 		// Something has gone wrong while parsing!
 		jmp_ERROR_EXIT:
-		if(element) free(element);
 
 		return 0;
+	}
+	/****************************************************************
+	* Allocate new child for the given parent and return the child. *
+	* NOTE: DOESN'T CHECK PARENT'S NULLNESS!.                       *
+	****************************************************************/
+	static CxxAbstractSyntaxTreeNode *addCxxChild(CxxAbstractSyntaxTreeNode *parent,CxxToken *token){
+
+		// Allocate the new child for the parent.
+		CxxAbstractSyntaxTreeNode *newchild=malloc(sizeof(CxxAbstractSyntaxTreeNode));
+		// Add child to parents linked list.
+		parent->childrenyoungest->siblingsyounger=newchild;
+		newchild->siblingsolder=parent->childrenyoungest;
+		parent->childlen++;
+		parent->childrenyoungest=newchild;
+		// Link to parent
+		newchild->parent=parent;
+		// Information set up of child.
+		newchild->childlen=0;
+		newchild->childrenoldest=0;
+		// This may not be evident but putting memory location of the oldest child
+		// to be youngest child makes so that pointer to new yougest child can be
+		// added without if else clause checking is yougestchild null.
+		// Negative for this in double linked list system is that memory location of
+		// pointer to oldest child is a ending marker when going through the children backwards.
+		newchild->childrenyoungest=(CxxAbstractSyntaxTreeNode*)&newchild->childrenoldest;
+		newchild->siblingsyounger=0;
+		newchild->token=token;
+	}
+	/**********************************************************************************
+	* Class-key was hit at some point so do futher processing.                        *
+	**********************************************************************************/
+	static CxxAbstractSyntaxTreeNode *CxxClassKey(){
+		;
 	}
 	/*****************
 	* See cxxlex.h   *
 	*****************/
 	CxxSyntaxError genCxxSyntaxTree(EtocSource *source,CxxAbstractSyntaxTreeNode **tree){
+
+		// Reference for the C++ grammar http://www.nongnu.org/hcb/#storage-class-specifier.
+
 		// Temporarily holder of tokens so that we don't call
 		// malloc unneeded.
 		CxxToken *token;
@@ -635,57 +671,28 @@
 		ite->token=0;
 		ite->childrenoldest=0;
 		// This may not be evident but putting memory location of the oldest child
-		// to be youngest child makes so that pointer to new yougest child can be
-		// added without if else clause checking is yougestchild null.
+		// to be youngest child makes so that pointer to new youngest child can be
+		// added without if else clause checking is youngestchild null.
 		// Negative for this in double linked list system is that memory location of
 		// pointer to oldest child is a ending marker when going through the children backwards.
-		ite->childrenyougest=(CxxAbstractSyntaxTreeNode*)&ite->childrenoldest;
+		ite->childrenyoungest=(CxxAbstractSyntaxTreeNode*)&ite->childrenoldest;
+
+		// This is temporary tree holder for symbols that don't tell immediately what symbols are.
+		CxxAbstractSyntaxTreeNode *tempholder;
 
 		// Lex the file to create abstract syntax tree.
 		while((token=cxxLexGetNext(source))){
 
-			switch(token->element)
+			switch(token->type){
+				// What is called class-key in C++ are class, struct, and union.
+				// Class-key maybe used in constructor/declaration or specifier
+				case CXX_TOKEN_CLASS:
 				case CXX_TOKEN_STRUCTURE:
-					CxxAbstractSyntaxTreeNode *newchild=malloc(sizeof(CxxAbstractSyntaxTreeNode));
-					ite->childrenyougest->siblingsyounger=newchild;
-					newchild->siblingsolder=ite->childrenyougest;
-					ite->childlen++;
-					ite->childrenyougest=newchild;
-					newchild->parent=ite;
-					newchild->childlen=0;
-					newchild->childrenoldest=0;
-					newchild->childrenyougest=(CxxAbstractSyntaxTreeNode*)&newchild->childrenoldest;
-					newchild->siblingsyounger=0;
-					newchild->token=token;
-					if((token=cxxLexGetNext(source))==CXX_TOKEN_){
-            ;
-					}
+				//case CXX_TOKEN_UNION:
+					// Keyword class, struct, or union was found.
+					tempholder=addCxxChild(ite,token);
 					break;
-				default:
-				{
-					// Allocate next child
-					CxxAbstractSyntaxTreeNode *newchild=malloc(sizeof(CxxAbstractSyntaxTreeNode));
-					ite->childrenyougest->siblingsyounger=newchild;
-					newchild->siblingsolder=ite->childrenyougest;
-					ite->childlen++;
-					ite->childrenyougest=newchild;
-					newchild->parent=ite;
-					newchild->childlen=0;
-					newchild->childrenoldest=0;
-					newchild->childrenyougest=(CxxAbstractSyntaxTreeNode*)&newchild->childrenoldest;
-					newchild->siblingsyounger=0;
-					newchild->token=token;
-
-					// Move to child.
-					ite=newchild;
-				}
-				{
-//				uint32_t tokenstrlen;
-//
-//				char *tokenstr=tokenTypeToStr(token,&tokenstrlen);
-//				printStrCat(STDOUT_FILENO,tokenstr," :\n",tokenstrlen,3);
-//				printStrCat(STDOUT_FILENO,token->characters,"\n",token->len,1);
-				}
+			}
 		}
 		return CXX_SYNTAX_GOOD;
 	}

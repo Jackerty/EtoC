@@ -18,7 +18,7 @@ typedef struct EtocSource{
 /****************************************
 * Token types.                          *
 ****************************************/
-enum CxxTokenType{
+typedef enum CxxTokenType{
 	CXX_TOKEN_COMMENT, // line or block
   CXX_TOKEN_INCLUDE,
   CXX_TOKEN_PREPROCESS_DEFINTION,
@@ -64,7 +64,7 @@ enum CxxTokenType{
   CXX_TOKEN_PUBLIC,
   CXX_TOKEN_THIS,
   CXX_TOKEN_STATEMENT_END // ;
-};
+}CxxTokenType;
 /***************************************
 * Syntax error that can be returned    *
 * generating the syntax.               *
@@ -80,7 +80,7 @@ typedef struct CxxToken{
   char *characters;
   int len;
   uint16_t numnewlines;
-  enum CxxTokenType type;
+  CxxTokenType type;
 }CxxToken;
 /**************************************
 * Symbol table handler.               *
@@ -96,7 +96,7 @@ typedef struct CxxAbstractSyntaxTreeNode{
 	struct CxxAbstractSyntaxTreeNode *siblingsyounger;
 	struct CxxAbstractSyntaxTreeNode *siblingsolder;
 	struct CxxAbstractSyntaxTreeNode *childrenoldest;
-	struct CxxAbstractSyntaxTreeNode *childrenyougest;
+	struct CxxAbstractSyntaxTreeNode *childrenyoungest;
 	struct CxxAbstractSyntaxTreeNode *parent;
 	CxxToken *token;
 	SymbolTable symbols;

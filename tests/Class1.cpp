@@ -208,9 +208,10 @@ class Cell{
 
 struct Depoyment
 {
+	Depoyment *next;
 	int pos;
 	int wave;
-	//UnitAI* unit;
+	Unit* unit;
 };
 
 class Commander
@@ -224,26 +225,23 @@ public:
 	int update_towers();
 	virtual void recrute_soldiers();
 	virtual Depoyment** deploy();
-	//virtual UnitAI** get_towers();
-	//virtual UnitAI** get_soldiers();
+	virtual Unit* get_towers();
+	virtual Unit* get_soldiers();
 	void recieve_funds(int funds);
-	//bool salary_paid(UnitAI* u);
+	bool salary_paid(UnitAI* u);
 
 protected:
 	int id;
-	//UnitAI* towers;
-	//UnitAI* army;
+	Unit* towers;
+	Unit* army;
+	Depoyment *depoymentlist;
 	long money;
 private:
 
 
 };
 
-class Comm{int j;};
-
 int main(){
-	struct Comm comm;
-  printf("%d\n",comm.j);
 
 	char inputbuffer[BUFFER_IO_SIZE];
 	int inputpoint=0;

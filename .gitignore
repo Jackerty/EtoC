@@ -7,3 +7,4 @@ cxxtoc
 test
 *.xml
 *.depend
+.objs
