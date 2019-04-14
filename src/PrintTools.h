@@ -7,10 +7,26 @@
 #define _PRINT_TOOLS_H_
 
 /**************************************************
-* Concatenates the two strings and prints the     *
-* result to given file descriptor. Returns amount *
+* Macro for writing that uses sizeof to detect    *
+* length of the string.                           *
+**************************************************/
+#define printconst(D,S) (void)write(D,S,sizeof(S)-1)
+/**************************************************
+* Macro for writing that uses strlen to detect    *
+* length of the string.                           *
+**************************************************/
+#define print(D,S) (void)write(D,S,strlen(S))
+/**************************************************
+* Concatenates two strings and prints the result  *
+* to given file descriptor. Returns amount        *
 * written or -1 on error (errno is set).          *
 **************************************************/
-int printStrCat(const int fd,char *str1,char *str2,int str1len,int str2len);
+int printStrCat(const int fd, const char *str1,const char *str2,const int str1len,const int str2len);
+/**************************************************
+* Concatenates three strings and prints the       *
+* result to given file desctiptor. Returns amount *
+* written or -1 on error (errno is set).          *
+**************************************************/
+int printStrCat3(const int fd,const char *str1,const char *str2,const char *str3,const int str1len,const int str2len,const int str3len);
 
 #endif /* _PRINT_TOOLS_H_ */

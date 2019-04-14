@@ -88,7 +88,6 @@ typedef struct EtocSourceLink{
 
 					sourceslast->source.bufferlen=filestats.st_blksize;
 					sourceslast->source.buffer=mmap(0,sourceslast->source.bufferlen,PROT_READ,MAP_PRIVATE,filedesc,0);
-					sourceslast->source.bufferpoint=0;
 
           CxxAbstractSyntaxTreeNode *tree=0;
 					genCxxSyntaxTree(&sourceslast->source,&tree);
@@ -114,6 +113,6 @@ typedef struct EtocSourceLink{
 				sourcesfirst=temp;
 			}
 		}
-		else (void)write(STDOUT_FILENO,USAGE,sizeof(USAGE));
+		else print(STDOUT_FILENO,USAGE);
 		return 0;
 	}

@@ -4,12 +4,12 @@
 #include<stdint.h>
 
 /*********************************************************
-* Macro for checking is does given option flag ask for   *
-* for argument.                                          *
+* Macro for checking does given option flag ask for      *
+* argument.                                              *
 *********************************************************/
 #define HAS_ARGUMENT(A) A.argument
 /*********************************************************
-* List types of flags OptionFlag structure can have.     *
+* List of types of flags OptionFlag structure can have.  *
 *********************************************************/
 #define OPHAND_VALUE 0b01
 #define OPHAND_POINTER_VALUE 0b10
@@ -21,7 +21,6 @@
 /*********************************************************
 * Macros for the option flags.                           *
 *********************************************************/
-//FIXME: Change to bit field
 typedef struct OptionFlag{
   uint8_t argument : 1;
   uint8_t type : 7;

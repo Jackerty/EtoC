@@ -8,3 +8,5 @@ test
 *.xml
 *.depend
 .objs
+*_old.c
+*_old.h

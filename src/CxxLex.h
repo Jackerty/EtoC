@@ -1,9 +1,34 @@
+/********************************************
+* Functions for creating syntax tree for    *
+* C++.                                      *
+********************************************/
+
 #ifndef _CXX_LEX_H_
 #define _CXX_LEX_H_
 
 #include<stddef.h>
 #include<stdint.h>
-
+/****************************************
+* Syntax tree tokens.                   *
+****************************************/
+typedef enum SyntaxTreeToken{
+	CXX_TOKEN_PREPROCESS_EMPTY,
+	CXX_TOKEN_PREPROCESS_INCLUDE,
+  CXX_TOKEN_PREPROCESS_DEFINTION,
+  CXX_TOKEN_PREPROCESS_IF,
+  CXX_TOKEN_PREPROCESS_IFDEF,
+  CXX_TOKEN_PREPROCESS_ELSE,
+  CXX_TOKEN_PREPROCESS_ENDIF,
+  CXX_TOKEN_PREPROCESS_PRAGMA,
+  CXX_TOKEN_PREPROCESS_WARNING,
+  CXX_TOKEN_PREPROCESS_ERROR,
+  CXX_TOKEN_PREPROCESS_MESSAGE,
+  CXX_TOKEN_PREPROCESS_LINE,
+  CXX_TOKEN_COMMENT_LINE,
+  CXX_TOKEN_COMMENT_BLOCK,
+  CXX_TOKEN_DECL,
+  CXX_TOKEN_ROOT,
+}SyntaxTreeToken;
 /****************************************
 * Structure for the source file buffer  *
 * handling which is nmapped or          *
@@ -11,115 +36,50 @@
 ****************************************/
 typedef struct EtocSource{
   char *buffer;
-  int bufferlen;
-  int bufferpoint;
+  uint32_t bufferlen;
   int filedesc;
 }EtocSource;
-/****************************************
-* Token types.                          *
-****************************************/
-typedef enum CxxTokenType{
-	CXX_TOKEN_COMMENT, // line or block
-  CXX_TOKEN_INCLUDE,
-  CXX_TOKEN_PREPROCESS_DEFINTION,
-  CXX_TOKEN_PREPROCESS_IF,
-  CXX_TOKEN_PREPROCESS_IFDEF,
-  CXX_TOKEN_PREPROCESS_ELSE,
-  CXX_TOKEN_PREPROCESS_ENDIF,
-  CXX_TOKEN_PRAGMA,
-  CXX_TOKEN_BRACES,      // { or }
-  CXX_TOKEN_PARENTHES,   // ( or )
-  CXX_TOKEN_BRACKETS,    // [ or ]
-  CXX_TOKEN_COMMA,       // ,
-  CXX_TOKEN_NUMBER_BIN,
-  CXX_TOKEN_NUMBER_OCTAL,
-  CXX_TOKEN_NUMBER_DEC,
-  CXX_TOKEN_NUMBER_HEX,
-  CXX_TOKEN_CHARACTER,   // 'x'
-  CXX_TOKEN_STRING,		   // "HELLO world"
-  CXX_TOKEN_IDENTIFIER,
-  CXX_TOKEN_DECLERATION,
-  CXX_TOKEN_OPERATOR,
-  CXX_TOKEN_IF,
-  CXX_TOKEN_ELSE,
-  CXX_TOKEN_ELSEIF,
-  CXX_TOKEN_FUNCTION,
-  CXX_TOKEN_STRUCTURE,
-  CXX_TOKEN_CLASS,
-  CXX_TOKEN_STATIC,
-  CXX_TOKEN_TYPEDEF,
-  CXX_TOKEN_ALIGNAS,
-  CXX_TOKEN_ALIGNOF,
-  CXX_TOKEN_AND,
-  CXX_TOKEN_AND_EQ,
-  CXX_TOKEN_ASM,
-  CXX_TOKEN_AUTO,
-  CXX_TOKEN_BOOL,
-  CXX_TOKEN_CHAR,
-  CXX_TOKEN_INLINE,
-  CXX_TOKEN_INT,
-  CXX_TOKEN_LONG,
-  CXX_TOKEN_PRIVATE,
-  CXX_TOKEN_PROTECTED,
-  CXX_TOKEN_PUBLIC,
-  CXX_TOKEN_THIS,
-  CXX_TOKEN_STATEMENT_END // ;
-}CxxTokenType;
+/**************************************
+* Structure for abstract syntax tree. *
+**************************************/
+typedef struct CxxSyntaxTreeNode{
+	struct CxxSyntaxTreeNode *siblingsyounger;
+	struct CxxSyntaxTreeNode *siblingsolder;
+	struct CxxSyntaxTreeNode *childrenoldest;
+	struct CxxSyntaxTreeNode *childrenyoungest;
+	struct CxxSyntaxTreeNode *parent;
+	uint32_t newlines;
+  uint32_t spaces;
+  uint32_t tabs;
+  uint32_t childlen;
+  SyntaxTreeToken token;
+  void *atttribute;
+}CxxSyntaxTreeNode;
 /***************************************
 * Syntax error that can be returned    *
 * generating the syntax.               *
 ***************************************/
 typedef enum CxxSyntaxError{
-	CXX_SYNTAX_GOOD,
+	CXX_SYNTAX_SUCCESS,
 	CXX_SYNTAX_
 }CxxSyntaxError;
-/***************************************
-* Token returned by lexer.             *
-***************************************/
-typedef struct CxxToken{
-  char *characters;
-  int len;
-  uint16_t numnewlines;
-  CxxTokenType type;
-}CxxToken;
-/**************************************
-* Symbol table handler.               *
-**************************************/
-typedef struct SymbolTable{
-	char *name;
-	struct CxxAbstractSyntaxTreeNode *startnode;
-}SymbolTable;
-/**************************************
-* Structure for abstract syntax tree. *
-**************************************/
-typedef struct CxxAbstractSyntaxTreeNode{
-	struct CxxAbstractSyntaxTreeNode *siblingsyounger;
-	struct CxxAbstractSyntaxTreeNode *siblingsolder;
-	struct CxxAbstractSyntaxTreeNode *childrenoldest;
-	struct CxxAbstractSyntaxTreeNode *childrenyoungest;
-	struct CxxAbstractSyntaxTreeNode *parent;
-	CxxToken *token;
-	SymbolTable symbols;
-  uint32_t childlen;
-}CxxAbstractSyntaxTreeNode;
+
 /*************************************************
-* Get next element of source.                    *
+* Get next C++ token from source file at         *
+* location pointed by bufferpoint and move       *
+* bufferpoint along.                             *
 *************************************************/
-CxxToken *cxxLexGetNext(EtocSource *file);
+CxxSyntaxError getCxxToken(EtocSource *source,uint32_t *bufferpointpointer,CxxSyntaxTreeNode *node);
 /*************************************************
 * Generates using the lexer abstract source tree *
 * Zero means successful generation and errors    *
 * are coded into numbers.                        *
 *************************************************/
-CxxSyntaxError genCxxSyntaxTree(EtocSource *source,CxxAbstractSyntaxTreeNode **tree);
+CxxSyntaxError genCxxSyntaxTree(EtocSource *source,CxxSyntaxTreeNode **tree);
 /*************************************************
 * Release the memory allocated during            *
 * genCxxSyntaxTree.                              *
 *************************************************/
-void freeCxxSyntaxTree(CxxAbstractSyntaxTreeNode *tree);
-/*************************************************
-* Token type to string of the type.              *
-*************************************************/
-char *tokenTypeToStr(const CxxToken *token,uint32_t *len);
+void freeCxxSyntaxTree(CxxSyntaxTreeNode *tree);
 
 #endif /* _CXX_LEX_H_ */
