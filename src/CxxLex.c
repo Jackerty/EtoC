@@ -46,7 +46,7 @@
 	****************/
 	CxxSyntaxError getCxxToken(EtocSource *source,uint32_t *bufferpointpointer,CxxSyntaxTreeNode *node){
 
-		// Capture buffer pointer here for easier writting.
+		// Capture buffer pointer here for easier writing.
 		uint32_t bufferpoint=*bufferpointpointer;
 
     while(bufferpoint<source->bufferlen){
@@ -68,7 +68,7 @@
 
 				// Preprocessing symbol.
 				case '#':
-					// Loop through whitespace.
+					// Loop through white-space.
 					while(source->buffer[bufferpoint++]==' ' && source->buffer[bufferpoint]=='\t');
 					switch(source->buffer[bufferpoint]){
 						// newline means empty

@@ -69,6 +69,10 @@ typedef struct EtocSourceLink{
     //       should be shown anyway!
 		if(opHand(argn-1,args+1,argops,sizeof(argops)/sizeof(Option))){
 
+			//*** CREATE THREAD WORKERS ***//
+
+
+
 			//*** PARSE THE FILES ***//
 			for(char **arg=args+1;*arg;arg++){
 				int32_t filedesc=open(*arg,O_RDONLY);
