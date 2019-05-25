@@ -1,45 +1,62 @@
 /*****************************************
 * Thread town handles thread work queue. *
 *****************************************/
+#ifndef _THREAD_TOWN_H_
+#define _THREAD_TOWN_H_
+
+#include<stdint.h>
 #include<pthread.h>
 
 /*****************************************
 * Work function for worker to do/call.   *
 *****************************************/
-typedef int ThreadTownWork(void*);
+typedef void *(*ThreadTownWork)(void*);
 /*****************************************
 * Work queue node.                       *
 *****************************************/
 typedef struct ThreadTownJob{
-	struct ThreadTownWork *next;
-	ThreadTownWork *func;
-	void *data;
-	int priority;
+	struct ThreadTownJob *next;
+	ThreadTownWork func;
+	void *param;
 }ThreadTownJob;
-/*****************************************
-* Thread town structure manages thread   *
-* workers in the "town".                 *
-*****************************************/
-typedef struct ThreadTown{
-	ThreadTownJob *workqueue;
-	ThreadTownJob *lastworkqueue;
-	pthread_t *workers;
-  pthread_mutex_t queueaddmutex;
-  phtread_mutex_t queuetakemutex;
-  uint32_t townpopulation;
-}ThreadTown;
 
 /*********************************************
 * Create Thread Town to given Thread town    *
 * location which has townpopulation variable *
 * set.                                       *
 *********************************************/
-void buildThreadTown(ThreadTown *town);
+void buildThreadTown(uint32_t population);
+/*********************************************
+* Populate town with threads including       *
+* caller thread. This functions returns      *
+* result of caller worker return value.      *
+*********************************************/
+void *populateThreadTown();
 /*********************************************
 * Destroy Thread Town and all of the memory  *
 * remaining at the queue.                    *
+* Returns rest of the results of joining     *
+* threads (there will be townpopulation-1    *
+* array of pointers returned). Results array *
+* is dynamiclly allocated and need to be     *
+* freed.                                     *
 *********************************************/
-void burnThreadTown(ThreadTown *town);
+void** burnThreadTown();
 /*********************************************
-*  *
+* Add job to the queue.                      *
 *********************************************/
+void addThreadTownJob(ThreadTownWork work,void *pram);
+/*********************************************
+* "Signal" threads to stop. Stop will        *
+* checked after worker has finished working. *
+*********************************************/
+void signalThreadTownToStop();
+/*********************************************
+* Add job list to the queue unsafelly. No    *
+* threading safe check should be made. This  *
+* is meant to be used initialize queue.      *
+* Before town is populated.                  *
+*********************************************/
+void addThreadTownJobUnsafe(ThreadTownJob *addition,ThreadTownJob *last);
+
+#endif /* _THREAD_TOWN_H_ */

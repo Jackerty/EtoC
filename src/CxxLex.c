@@ -17,7 +17,7 @@
 		// Negative for this in double linked list system is that memory location of
 		// pointer to oldest child is a ending marker when going through the children backwards.
 		node->childrenoldest=0;
-		node->childrenyoungest=(CxxSyntaxTreeNode*)&newchild->childrenoldest;
+		node->childrenyoungest=(CxxSyntaxTreeNode*)&node->childrenoldest;
 		node->siblingsyounger=0;
 		return node;
 	}
@@ -44,63 +44,54 @@
 	/****************
 	* See cxxlex.h  *
 	****************/
-	CxxSyntaxError getCxxToken(EtocSource *source,uint32_t *bufferpointpointer,CxxSyntaxTreeNode *node){
+	CxxSyntaxError getCxxToken(CxxSyntaxTreeNode *node){
+		CxxSyntaxError error=CXX_SYNTAX_SUCCESS;
 
-		// Capture buffer pointer here for easier writing.
-		uint32_t bufferpoint=*bufferpointpointer;
+		switch(source->buffer[bufferpoint]){
+			// Collect newlines, space, and tabs
+			// before next
+			case '\n':
+				node->newlines++;
+				continue;
+			case  ' ':
+				node->spaces++;
+				continue;
+			case '\t':
+				node->tabs++;
+				continue;
+			case '\r':
+				continue;
 
-    while(bufferpoint<source->bufferlen){
-
-			switch(source->buffer[bufferpoint]){
-				// Collect newlines, space, and tabs
-				// before next
-				case '\n':
-					node->newlines++;
-					continue;
-				case  ' ':
-					node->spaces++;
-					continue;
-				case '\t':
-					node->tabs++;
-					continue;
-				case '\r':
-					continue;
-
-				// Preprocessing symbol.
-				case '#':
-					// Loop through white-space.
-					while(source->buffer[bufferpoint++]==' ' && source->buffer[bufferpoint]=='\t');
-					switch(source->buffer[bufferpoint]){
-						// newline means empty
-						case '\n':
-							node->token=CXX_TOKEN_PREPROCESS_EMPTY;
-							break;
-						// Definition
-						case 'd':
-							break;
-						// Ether endif, else, or error
-						case 'e':
-							break;
-						// Ether include, if, or ifdef
-						case 'i':
-							break;
-					}
-					break;
+			// Preprocessing symbol.
+			case '#':
+				// Loop through white-space.
+				while(source->buffer[bufferpoint++]==' ' && source->buffer[bufferpoint]=='\t');
+				switch(source->buffer[bufferpoint]){
+					// newline means empty
+					case '\n':
+						node->token=CXX_TOKEN_PREPROCESS_EMPTY;
+						break;
+					// Definition
+					case 'd':
+						break;
+					// Ether endif, else, or error
+					case 'e':
+						break;
+					// Ether include, if, or ifdef
+					case 'i':
+						break;
+				}
+				break;
 
 				//
-			}
-
-    }
-
-    // Store buffer pointer back to memory.
-		*bufferpointpointer=bufferpoint;
+		}
 
 		return CXX_SYNTAX_SUCCESS;
 	}
 	/****************
-  * See cxxlex.h  *
-  ****************/
-	CxxSyntaxError genCxxSyntaxTree(EtocSource *source,CxxSyntaxTreeNode **tree){
+	* See cxxlex.h  *
+	****************/
+	CxxSyntaxError genCxxSyntaxTree(int filedesc,CxxSyntaxTreeNode **trunk){
 		// If error happens result will be changed.
 		// This is returned matter what.
 		CxxSyntaxError result=CXX_SYNTAX_SUCCESS;
@@ -128,9 +119,11 @@
 
 			CxxSyntaxTreeNode *temp1=allocCxxNode();
 
-			switch(temp1.token){
-			case CXX_TOKEN:
-			case :
+			switch(temp1->token){
+			case CXX_TOKEN_DECL:
+				break;
+			case CXX_TOKEN_COMMENT_BLOCK:
+				break;
 			}
 
 		}while(bufferpoint<source->bufferlen);

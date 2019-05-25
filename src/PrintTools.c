@@ -40,3 +40,38 @@
 			return write(fd,iobuffer,iobufferlen);
 		#endif /* _POSIX_C_SOURCE */
 	}
+	/*******************
+	* See PrintTools.h *
+	*******************/
+	int printStrCat4(const int fd,char *str1,char *str2,char *str3,char *str4,const int str1len,const int str2len,const int str3len,const int str4len){
+		#if _POSIX_C_SOURCE>=200112L
+			const struct iovec io[]={{str1,str1len},{str2,str2len},{str3,str3len},{str4,str4len}};
+			return writev(fd,io,sizeof(io)/sizeof(struct iovec));
+		#else
+			const size_t iobufferlen=str1len+str2len+str3len+str4len;
+			char iobuffer[iobufferlen];
+			memcpy(iobuffer,str1,str1len);
+			memcpy(iobuffer+str1len,str2,str2len);
+			memcpy(iobuffer+str1len+str2len,str3,str3len);
+			memcpy(iobuffer+str1len+str2len+str3len,str4,str4len);
+			return write(fd,iobuffer,iobufferlen);
+		#endif /* _POSIX_C_SOURCE */
+	}
+	/*******************
+	* See PrintTools.h *
+	*******************/
+	int printStrCat5(const int fd,char *str1,char *str2,char *str3,char *str4,char *str5,const int str1len,const int str2len,const int str3len,const int str4len,const int str5len){
+		#if _POSIX_C_SOURCE>=200112L
+			const struct iovec io[]={{str1,str1len},{str2,str2len},{str3,str3len},{str4,str4len},{str5,str5len}};
+			return writev(fd,io,sizeof(io)/sizeof(struct iovec));
+		#else
+			const size_t iobufferlen=str1len+str2len+str3len+str4len+str5len;
+			char iobuffer[iobufferlen];
+			memcpy(iobuffer,str1,str1len);
+			memcpy(iobuffer+str1len,str2,str2len);
+			memcpy(iobuffer+str1len+str2len,str3,str3len);
+			memcpy(iobuffer+str1len+str2len+str3len,str4,str4len);
+			memcpy(iobuffer+str1len+str2len+str3len+str4len,str5,str5len);
+			return write(fd,iobuffer,iobufferlen);
+		#endif /* _POSIX_C_SOURCE */
+	}

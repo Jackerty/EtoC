@@ -4,7 +4,8 @@
 CC?=gcc
 
 S:=src
-CFLAGS:= -Wall
+
+CFLAGS:= -Wall -std=c18 $(EXTRA_CFLAGS)
 
 RELEASE?=0
 ifeq ($(RELEASE),0)
@@ -15,8 +16,8 @@ else ifeq ($(RELEASE),1)
   CFLAGS+=-O3
 endif
 
-CXX_OBJECTS:= $(addprefix $(O)/,Cxx.o CxxLex.o OpHand.o PrintTools.o)
-CXX_LIBS:=
+CXX_OBJECTS:= $(addprefix $(O)/,Cxx.o CxxLex.o OpHand.o PrintTools.o ThreadTown.o)
+CXX_LIBS:=-pthread
 CXXEXE:=cxxtoc
 
 .PHONY: all clean moduletest test_OpHand
@@ -31,6 +32,8 @@ moduletest: test_OpHand
 
 test_OpHand: moduletest/test_OpHand.c src/OpHand.c
 	$(CC) $(CFLAGS) $^ -otest
+test_ThreadTown: moduletest/test_ThreadTown.c src/ThreadTown.c src/PrintTools.c
+	$(CC) $(CFLAGS) $^ -otest -pthread
 
 $(O)/%.o:$(S)/%.c | $(O)
 	$(CC) -c $(CFLAGS) -o$@ $<

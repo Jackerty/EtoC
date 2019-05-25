@@ -5,11 +5,13 @@
 #include<fcntl.h>
 #include<stdlib.h>
 #include<sys/stat.h>
-#include<sys/mman.h>
+#include<errno.h>
 #include<string.h>
+#include<ctype.h>
 #include"CxxLex.h"
 #include"OpHand.h"
 #include"PrintTools.h"
+#include"ThreadTown.h"
 
 /******************************
 * String that is version of   *
@@ -24,24 +26,71 @@
 /******************************
 * String returned by help     *
 * option and if no arguments  *
-* where given.                *
+* where given. Strings tells  *
+* usage of the program and    *
+* options.                    *
 ******************************/
-#define USAGE "Usage: "
+#define USAGE "Usage: cxxtoc [options] sourcefile...\n" \
+              "\n"\
+              "Compiler for C++ to C\n" \
+              "\n"\
+              "Options:\n" \
+              "-v, --version\t give version information\n" \
+              "-h, --help   \t give usage information\n" \
+              "\n"
 
-/*******************************
-* Structure for linked listing *
-* EtocSource structure.        *
-*******************************/
-typedef struct EtocSourceLink{
-	struct EtocSourceLink *next;
-	EtocSource source;
-}EtocSourceLink;
+  /*******************************************
+  * Job to build syntax tree from given     *
+  * file.                                    *
+  *******************************************/
+	void *orderGenSyntaxTree(void* param){
+		// Cast the parameter to actual parameters.
+		char *file=param;
 
+		// File description
+    int fd;
+
+		// Check that file exists by opening file descriptor.
+		if((fd=open(file,O_RDONLY))>-1){
+
+			// Call the generator.
+			;
+
+			// We are done reading the file so close
+			close(fd);
+
+			// Add next job to list.
+			;
+
+			//REMOVE ME!!!!!!!!
+			signalThreadTownToStop();
+			//REMOVE ME!!!!!!!!
+
+		}
+		else{
+			// Note that strerror comes from read-only memory here!!
+			char *errnostr=strerror(errno);
+			printStrCat5(STDOUT_FILENO
+			            ,"File \""
+			            ,file
+			            ,"\" access failed with errno: "
+			            ,errnostr,"\n"
+			            ,6
+			            ,strlen(file)
+								  ,28
+								  ,strlen(errnostr)
+								  ,1
+								  );
+			signalThreadTownToStop();
+		}
+
+		return 0;
+	}
 	/*******************************************
 	* Handles arguments and start compilation  *
 	* to given folder or C++ source files.     *
 	*                                          *
-	* Non option are considered as file names. *
+	* Operands are considered as source files. *
 	* Every single character option has long   *
 	* version but not all long options have    *
 	* single.                                  *
@@ -51,8 +100,6 @@ typedef struct EtocSourceLink{
 	*******************************************/
 	int main(int argn,char **args){
 		//*** VARIABLES ***//
-		EtocSourceLink *sourcesfirst;
-		EtocSourceLink *sourceslast=(EtocSourceLink*)&sourcesfirst;
 
 		//*** INITIALIZATION ***//
 		//**LOAD CONFIGURATION **//
@@ -64,59 +111,46 @@ typedef struct EtocSourceLink{
 			{"help"   ,.variable.str=(char **)USAGE            ,.value.v32=sizeof(USAGE)            ,'h',{0,OPHAND_PRINT}}
     };
     // Note that first argument from the main is the call path!
-    // TODO: If help or version was given there is no need to tell usage
-    //       however if nether is given and files are not given usage
-    //       should be shown anyway!
-		if(opHand(argn-1,args+1,argops,sizeof(argops)/sizeof(Option))){
+    // There for we have one less argument and pointer is moved
+    // one a head.
+		if(argn>1){
+			if(opHand(argn-1,args+1,argops,sizeof(argops)/sizeof(Option))){
 
-			//*** CREATE THREAD WORKERS ***//
-
-
-
-			//*** PARSE THE FILES ***//
-			for(char **arg=args+1;*arg;arg++){
-				int32_t filedesc=open(*arg,O_RDONLY);
-				if(filedesc>-1){
-
-					// Allocate new source file structure to the linked list.
-					sourceslast->next=malloc(sizeof(EtocSourceLink));
-          sourceslast=sourceslast->next;
-
-          // Store the file descriptor
-          sourceslast->source.filedesc=filedesc;
-
-					// Query size of the file so that we can nmap it as whole
-					// and do know when our file ends.
-					struct stat filestats;
-					fstat(filedesc,&filestats);
-
-					sourceslast->source.bufferlen=filestats.st_blksize;
-					sourceslast->source.buffer=mmap(0,sourceslast->source.bufferlen,PROT_READ,MAP_PRIVATE,filedesc,0);
-
-          CxxAbstractSyntaxTreeNode *tree=0;
-					genCxxSyntaxTree(&sourceslast->source,&tree);
-          freeCxxSyntaxTree(tree);
-
+				//** BUILD TOWN FOR THREAD WORKERS **//
+				{
+					uint32_t cpucount=sysconf(_SC_NPROCESSORS_ONLN);
+					buildThreadTown(cpucount);
 				}
-				else{
-						(void)printStrCat(STDERR_FILENO,*arg," opening failed!\n",strlen(*arg),17);
-						break;
-				}
-			}
-			// Mark current ending of source files linked list to null pointer
-			// to make sure ending is found.
-			sourceslast->next=0;
 
-			//*** EXIT ***//
-			// Make sure nmaps and files are freed.
-			while(sourcesfirst){
-				munmap(sourcesfirst->source.buffer,sourcesfirst->source.bufferlen);
-				close(sourcesfirst->source.filedesc);
-				EtocSourceLink *temp=sourcesfirst->next;
-				free(sourcesfirst);
-				sourcesfirst=temp;
+				// Check that files are accessable and
+				// push first list of task to queue.
+				{
+					ThreadTownJob *initjob;
+					// By this initilization we don't have specially handle last
+					// job when we call the addThreadTownJobUnsafe.
+					ThreadTownJob *lastjob=(ThreadTownJob*)&initjob;
+					for(char **file=args+1;*file;file++){
+						lastjob->next=malloc(sizeof(ThreadTownJob));
+						lastjob=lastjob->next;
+
+						lastjob->func=orderGenSyntaxTree;
+						lastjob->param=*file;
+					}
+
+					addThreadTownJobUnsafe(initjob,lastjob);
+				}
+
+				void *callerreturn=populateThreadTown();
+
+				void **restofresults=burnThreadTown();
+				free(restofresults);
+
+				//*** HANDLE RETURN VALUES ***//
+
+
 			}
 		}
-		else print(STDOUT_FILENO,USAGE);
+		else printconst(STDOUT_FILENO,USAGE);
+
 		return 0;
 	}

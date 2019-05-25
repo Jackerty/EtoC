@@ -10,3 +10,5 @@ test
 .objs
 *_old.c
 *_old.h
+*_old2.c
+*_old2.h

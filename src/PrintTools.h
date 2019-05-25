@@ -28,5 +28,17 @@ int printStrCat(const int fd, const char *str1,const char *str2,const int str1le
 * written or -1 on error (errno is set).          *
 **************************************************/
 int printStrCat3(const int fd,const char *str1,const char *str2,const char *str3,const int str1len,const int str2len,const int str3len);
+/**************************************************
+* Concatenates four strings and prints the result *
+* to given file desctiptor. Returns amount        *
+* written or -1 on error (errno is set).          *
+**************************************************/
+int printStrCat4(const int fd,const char *str1,const char *str2,const char *str3,const char *str4,const int str1len,const int str2len,const int str3len,const int str4len);
+/**************************************************
+* Concatenates four strings and prints the result *
+* to given file desctiptor. Returns amount        *
+* written or -1 on error (errno is set).          *
+**************************************************/
+int printStrCat5(const int fd,const char *str1,const char *str2,const char *str3,const char *str4,const char *str5,const int str1len,const int str2len,const int str3len,const int str4len,const int str5len);
 
 #endif /* _PRINT_TOOLS_H_ */
