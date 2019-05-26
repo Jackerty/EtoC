@@ -47,6 +47,8 @@
 		// Cast the parameter to actual parameters.
 		char *file=param;
 
+		if(checkExist){}
+
 		// File description
     int fd;
 

@@ -42,12 +42,12 @@
 		return newchild;
 	}
 	/****************
-	* See cxxlex.h  *
+	* See Cxxlex.h  *
 	****************/
-	CxxSyntaxError getCxxToken(CxxSyntaxTreeNode *node){
+	CxxSyntaxError getCxxToken(int fd,char **buffer,uint32_t *bufferpoint,CxxSyntaxTreeNode *node){
 		CxxSyntaxError error=CXX_SYNTAX_SUCCESS;
 
-		switch(source->buffer[bufferpoint]){
+		switch(buffer[*bufferpoint]){
 			// Collect newlines, space, and tabs
 			// before next
 			case '\n':
@@ -65,8 +65,8 @@
 			// Preprocessing symbol.
 			case '#':
 				// Loop through white-space.
-				while(source->buffer[bufferpoint++]==' ' && source->buffer[bufferpoint]=='\t');
-				switch(source->buffer[bufferpoint]){
+				while(source->buffer[(*bufferpoint)++]==' ' && source->buffer[(*bufferpoint)++]=='\t');
+				switch(source->buffer[*bufferpoint]){
 					// newline means empty
 					case '\n':
 						node->token=CXX_TOKEN_PREPROCESS_EMPTY;
@@ -89,7 +89,7 @@
 		return CXX_SYNTAX_SUCCESS;
 	}
 	/****************
-	* See cxxlex.h  *
+	* See Cxxlex.h  *
 	****************/
 	CxxSyntaxError genCxxSyntaxTree(int filedesc,CxxSyntaxTreeNode **trunk){
 		// If error happens result will be changed.
@@ -132,18 +132,18 @@
 		return result;
 	}
 	/****************
-	* See cxxlex.h  *
+	* See Cxxlex.h  *
 	****************/
 	void freeCxxSyntaxTree(CxxSyntaxTreeNode *tree){
 		CxxSyntaxTreeNode *ite=tree;
 		while(ite){
 			if(ite->childrenoldest){
-					// To prevent infinite loop
-					// we have to mark that there
-					// is no children
-					CxxSyntaxTreeNode *nochild=ite;
-					ite=ite->childrenoldest;
-					nochild->childrenoldest=0;
+				// To prevent infinite loop
+				// we have to mark that there
+				// is no children
+				CxxSyntaxTreeNode *nochild=ite;
+				ite=ite->childrenoldest;
+				nochild->childrenoldest=0;
 			}
 			else if(ite->siblingsyounger){
 				CxxSyntaxTreeNode *remove=ite;

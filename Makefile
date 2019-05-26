@@ -35,6 +35,9 @@ test_OpHand: moduletest/test_OpHand.c src/OpHand.c
 test_ThreadTown: moduletest/test_ThreadTown.c src/ThreadTown.c src/PrintTools.c
 	$(CC) $(CFLAGS) $^ -otest -pthread
 
+resHash: research/HashResearch.c
+	$(CC) $(CFLAGS) $^ -otest
+
 $(O)/%.o:$(S)/%.c | $(O)
 	$(CC) -c $(CFLAGS) -o$@ $<
 

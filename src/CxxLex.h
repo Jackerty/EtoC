@@ -7,22 +7,6 @@
 
 #include<stdint.h>
 
-/**************************************
-* Structure for abstract syntax tree. *
-**************************************/
-typedef struct CxxSyntaxTreeNode{
-	struct CxxSyntaxTreeNode *siblingsyounger;
-	struct CxxSyntaxTreeNode *siblingsolder;
-	struct CxxSyntaxTreeNode *childrenoldest;
-	struct CxxSyntaxTreeNode *childrenyoungest;
-	struct CxxSyntaxTreeNode *parent;
-	uint32_t newlines;
-  uint32_t spaces;
-  uint32_t tabs;
-  uint32_t childlen;
-  SyntaxTreeToken token;
-  void *atttribute;
-}CxxSyntaxTreeNode;
 /***************************************
 * Syntax error that can be returned    *
 * generating the syntax.               *
@@ -52,14 +36,30 @@ typedef enum SyntaxTreeToken{
   CXX_TOKEN_DECL,
   CXX_TOKEN_ROOT,
 }SyntaxTreeToken;
+/**************************************
+* Structure for abstract syntax tree. *
+**************************************/
+typedef struct CxxSyntaxTreeNode{
+	struct CxxSyntaxTreeNode *siblingsyounger;
+	struct CxxSyntaxTreeNode *siblingsolder;
+	struct CxxSyntaxTreeNode *childrenoldest;
+	struct CxxSyntaxTreeNode *childrenyoungest;
+	struct CxxSyntaxTreeNode *parent;
+	uint32_t newlines;
+  uint32_t spaces;
+  uint32_t tabs;
+  uint32_t childlen;
+  SyntaxTreeToken token;
+  void *atttribute;
+}CxxSyntaxTreeNode;
 
-/*************************************************
+/************************************************
 * Get next C++ token from source file at         *
 * location pointed by bufferpoint and move       *
 * bufferpoint along.                             *
-*************************************************/
-CxxSyntaxError getCxxToken(EtocSource *source,uint32_t *bufferpointpointer,CxxSyntaxTreeNode *node);
-/*************************************************
+************************************************/
+CxxSyntaxError getCxxToken(int fd,char **buffer,uint32_t *bufferpoint,CxxSyntaxTreeNode *node);
+/************************************************
 * Get next C++ token from source file at         *
 * location pointed by bufferpoint and move       *
 * bufferpoint along.                             *
