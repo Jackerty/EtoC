@@ -5,13 +5,14 @@
 #include<unistd.h>
 #include<stdlib.h>
 #include<stdio.h>
+#include<string.h>
 #if (defined(__linux__) && (__GLIBC__ > 2 || (__GLIBC__==2 && __GLIBC_MINOR__ >=25))) || defined(GEN_RANDOM_USE_GET_RANDOM)
 	#include<sys/random.h>
 #endif /* __NR_getrandom */
 
 #define RAND_STRING_MAX 255
 #define RECOMENTED_RAND_BUFFER_SIZE 512
-#define DEFAULT_HASH_TABLE_SIZE 37
+#define DEFAULT_HASH_TABLE_SIZE 41
 
 /*******************************************
 * Random buffer to be used different       *
@@ -76,6 +77,9 @@ char *randStr(char *memory){
 
 	// Generate length of the string.
 	if(usage+1>=RECOMENTED_RAND_BUFFER_SIZE) genRandom();
+	// TODO: This is bit navy since when length of the string get
+	//       large so does change of getting certain string. Hence
+	//       string size probablity should scale with length.
 	uint8_t lengthofstr=(uint8_t)randombuffer[usage++];
 
 	uint32_t remainder=RECOMENTED_RAND_BUFFER_SIZE-usage;
@@ -110,8 +114,22 @@ int main(){
 	// Test string
 	char teststr[RAND_STRING_MAX+1];
 
+	// Collision arrays collect information on
+	// what collisions happen for each tested
+	// hash function on different sized hash
+	// table. Number of certain indexes appearing
+	// are stored at that column index of the row
+	// of the hash. Hashes appear same order as they
+	// appear in the code below.
+	uint32_t collision32[3][32];
+	uint32_t collision41[3][41];
+	uint32_t collision61[3][61];
+	uint32_t collision64[3][64];
+	uint32_t collision64[3][79];
+	uint32_t collision64[3][126];
+
 	// Number of hash tests
-	uint32_t numberoftest=20;
+	uint32_t numberoftest=40;
 
 	// Result hash of the test
 	uint32_t hash;
@@ -143,6 +161,65 @@ int main(){
     }
 		hash%=DEFAULT_HASH_TABLE_SIZE;
 		printf("Polynomial rolling: %u\n",hash);
+
+		// Calculate Paul Hsieh's hash
+		// From https://burtleburtle.net/bob/hash/doobs.html
+		// Really doesn't explain what happens.
+		{
+			#define get16bits(d) (*((const uint8_t *)(d)))
+			// Initialize by size of the string.
+			// This has benefit of different size strings
+			// that have same ending are more like to be different.
+			uint32_t len=strlen(teststr);;
+			hash=len;
+			uint32_t tmp;
+			int32_t rem=len%3;
+			len>>=2;
+			char *data=teststr;
+			// Loop and operations on hash
+			while(len>0){
+				hash+=get16bits(data);
+				tmp=(get16bits(data+2)<<11)^hash;
+				hash=(hash<<16)^tmp;
+				data+=2*sizeof(uint16_t);
+				hash+=hash>>11;
+				len--;
+			}
+
+			// Handle remainder that part which
+			// needed because previos loop needs
+			// four bytes at the time.
+			switch(rem){
+			case 3:
+				hash+=get16bits(data);
+				hash^=hash<<16;
+				hash^=data[sizeof(uint16_t)]<<18;
+				hash+=hash>>11;
+				break;
+			case 2:
+				hash+=get16bits(data);
+				hash^=hash<<11;
+				hash+=hash>>17;
+				break;
+			case 1:
+				hash+=*data;
+				hash^=hash<<10;
+				hash+=hash>>1;
+				break;
+			}
+
+			// Comment here says:
+			//   "Force "avalanching" of final 127 bits".
+			// This phase probably makes sure 32 bit integer is used more equally??
+			hash^=hash<<3;
+			hash+=hash>>5;
+			hash^=hash<<4;
+			hash+=hash>>17;
+			hash^=hash<<25;
+			hash+=hash>>6;
+		}
+		hash%=DEFAULT_HASH_TABLE_SIZE;
+		printf("Paul Hsieh's: %u\n",hash);
 
 		// We are at the end so put newline into the output.
 		puts("\n");

@@ -47,8 +47,6 @@
 		// Cast the parameter to actual parameters.
 		char *file=param;
 
-		if(checkExist){}
-
 		// File description
     int fd;
 
@@ -143,12 +141,12 @@
 				}
 
 				void *callerreturn=populateThreadTown();
-
 				void **restofresults=burnThreadTown();
-				free(restofresults);
 
 				//*** HANDLE RETURN VALUES ***//
 
+				// We need to free restofresult array.
+				free(restofresults);
 
 			}
 		}
