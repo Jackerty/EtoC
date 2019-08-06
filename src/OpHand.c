@@ -30,31 +30,24 @@
 				// Return whatever callback returns
 				return option->variable.func(option->option,option->value.coderdata,0);
 		}
-		return 1;
+		return !option->flags.stop;
 	}
 	/*********************************
 	* Handles argument options.      *
 	*********************************/
-	static uint8_t switchArgument(const char *arg,const Option *option){
+	static uint8_t switchArgument(char *arg,const Option *option){
 		switch(option->flags.type){
 			case OPHAND_VALUE:
 				*option->variable.p32=atoi(arg);
 				break;
 			case OPHAND_POINTER_VALUE:
-				// Bit of extra feature but since
-				// one can free memory used for arguments
-				// here we make copy of the argument
-				// When is this memory freed?
-				*option->variable.str=malloc(strlen(arg));
-				if(*option->variable.str) strcpy(*option->variable.str,arg);
-				else return 0;
+				*option->variable.str=arg;
 				break;
 			case OPHAND_FUNCTION:
 				// Return whatever callback returns
 				return option->variable.func(option->option,option->value.coderdata,arg);
-
 		}
-		return 1;
+		return !option->flags.stop;
 	}
 	/***************
 	* See OpHand.h *
@@ -136,14 +129,15 @@
 				}
       }
 			else args[nonoptpoint++]=args[arg];
-    jmp_OUTER_LOOP_CONTINUE:;
+			jmp_OUTER_LOOP_CONTINUE:;
     }
 
-    // Read nonoptpoint description!
-    args[nonoptpoint]=0;
+    // Mark the ending as description wanted!
+    *(args+nonoptpoint)=0;
 
 		return 1;
 
 		jmp_ERROR:
 		return 0;
 	}
+

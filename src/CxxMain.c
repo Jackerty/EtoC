@@ -40,7 +40,7 @@
               "\n"
 
   /*******************************************
-  * Job to build syntax tree from given     *
+  * Job to build syntax tree from given      *
   * file.                                    *
   *******************************************/
 	void *orderGenSyntaxTree(void* param){

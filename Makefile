@@ -16,8 +16,8 @@ else ifeq ($(RELEASE),1)
   CFLAGS+=-O3
 endif
 
-CXX_OBJECTS:= $(addprefix $(O)/,Cxx.o CxxLex.o OpHand.o PrintTools.o ThreadTown.o)
-CXX_LIBS:=-pthread
+CXX_OBJECTS:= $(addprefix $(O)/,CxxMain.o CxxLex.o OpHand.o PrintTools.o ThreadTown.o)
+CXX_LIBS:=-pthread -lrt
 CXXEXE:=cxxtoc
 
 .PHONY: all clean moduletest test_OpHand

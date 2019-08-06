@@ -9,7 +9,8 @@
 *********************************************************/
 #define HAS_ARGUMENT(A) A.argument
 /*********************************************************
-* List of types of flags OptionFlag structure can have.  *
+* List of types of flags OptionFlag structure member     *
+* type can have.                                         *
 *********************************************************/
 #define OPHAND_VALUE 0b01
 #define OPHAND_POINTER_VALUE 0b10
@@ -20,10 +21,19 @@
 
 /*********************************************************
 * Macros for the option flags.                           *
+*                                                        *
+* Members:                                               *
+*   argument bit tells does option have argument.        *
+*   stop     bit tells should parsing to be stoped after *
+*            this option.                                *
+*   type     bit tells what operation is performed. Look *
+*            macros up for operation that can be         *
+*            performed.                                  *
 *********************************************************/
 typedef struct OptionFlag{
   uint8_t argument : 1;
-  uint8_t type : 7;
+  utin8_t stop : 1;
+  uint8_t type : 6;
 }OptionFlag;
 
 /*********************************************************
