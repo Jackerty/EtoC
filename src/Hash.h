@@ -12,23 +12,32 @@
 *     // HEADER                                       *
 *     struct HashEntry *next;                         *
 *     char *key;                                      *
+*     uint32_t hash;                                  *
 *     // VALUE KEY MAP TO                             *
 *     int value;                                      *
 *   }                                                 *
 *                                                     *
-* Important thing is there is linked list pointer and *
-* key string are same offset in the structure when    *
-* given to addition function.                         *
+* Important thing is there is header members are same *
+* offset in the structure when given to addition      *
+* addition function. Note that because last member of *                       
+* header is 32 bit long it means that you should      *
+* put 32 bit data before 64 bit data so that there    *
+* isn't 32 bits of padding try something more risque  *
+* like addressing to middle of the structure.         *
+*                                                     *
 * You can also use HASH_TABLE_ENTRY_HEADER macro to   *
 * makes sure that needed members are there.           *
 ******************************************************/
-#incldue<stdint.h>
+#include<stdint.h>
 
 /******************************************************
 * Hash table entry header macro is to make programmer *
 * not f'up entries.                                   *
 ******************************************************/
-#define HASH_TABLE_ENTRY_HEADER struct HashEntry *next;char *key;
+#define HASH_TABLE_ENTRY_HEADER \
+	struct HashEntry *next; \
+	char *key; \
+	uint32_t hash;
 
 /******************************************************
 * Hash table entry header.                            *
@@ -37,17 +46,20 @@
 ******************************************************/
 typedef struct HashEntry{
 	struct HashEntry *next;
-	char *key;
+	void *key;
+	uint32_t hash;
 }HashEntry;
 /******************************************************
 * Hash table is array of linked listed entries of     *
 * length. Length may changes if too many conclicts    *
-* have happened.                                      *
+* have happened. Also length maybe stored in minus    *
+* one format meaning that to get true length you have *
+* to add one.                                         *
 ******************************************************/
 typedef struct HashTable{
-	struct HashEntry **entries;
+	struct HashEntry **buckets;
 	int32_t length;
-	uint32_t conflicts;
+	uint32_t collision;
 }HashTable;
 
 /******************************************************
@@ -55,7 +67,7 @@ typedef struct HashTable{
 * Does not allocate memory HashTable structure only   *
 * inners!                                             *
 ******************************************************/
-void initHashTable(HashTable *table,uint32_t initializesize);
+uint8_t initHashTable(HashTable *table,int32_t initializesize);
 /******************************************************
 * Function adds hash entry to the given table.        *
 * Added entries should be dynamicly allocated.        *
@@ -64,7 +76,7 @@ void addHashTableEntry(HashTable *table,HashEntry *entry);
 /******************************************************
 * Functions gets entry from the hash table.           *
 ******************************************************/
-HashEntry *getHashTableEntry(HashTable *table,char *key);
+HashEntry *getHashTableEntry(HashTable *table,void *key);
 /******************************************************
 * Destroy hash table structure inners! Does not free  *
 * structure it self!                                  *
@@ -75,6 +87,6 @@ void destroyHashTable(HashTable *table);
 * http://burtleburtle.net/bob/c/lookup3.c             *
 *                                                     *
 * Function is combination of Little and big endian    *
-* optimazations.                                      *
+* functions that optimize for little and big endian.  *
 ******************************************************/
-uint32_t hashBobJenkins(const char *key,uint32_t initval);
+uint32_t hashBobJenkins(const void *key,uint32_t initval);

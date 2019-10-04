@@ -3,6 +3,7 @@
 ***************************************/
 #include<stdint.h>
 #include<stdlib.h>
+#include"BufferManager.h"
 #include"CxxLex.h"
 
 	/****************************************************************
@@ -44,29 +45,33 @@
 	/****************
 	* See Cxxlex.h  *
 	****************/
-	CxxSyntaxError getCxxToken(int fd,char **buffer,uint32_t *bufferpoint,CxxSyntaxTreeNode *node){
+	CxxSyntaxError getCxxToken(IoBuffer *buffer,CxxSyntaxTreeNode *node){
 		CxxSyntaxError error=CXX_SYNTAX_SUCCESS;
 
-		switch(buffer[*bufferpoint]){
+		jmp_STATISTIC_OR_EMPTY:
+		switch(getIoBufferByte(buffer)){
 			// Collect newlines, space, and tabs
 			// before next
 			case '\n':
 				node->newlines++;
-				continue;
+				goto jmp_STATISTIC_OR_EMPTY;
 			case  ' ':
 				node->spaces++;
-				continue;
+				goto jmp_STATISTIC_OR_EMPTY;
 			case '\t':
 				node->tabs++;
-				continue;
+				goto jmp_STATISTIC_OR_EMPTY;
 			case '\r':
-				continue;
+				goto jmp_STATISTIC_OR_EMPTY;
 
 			// Preprocessing symbol.
 			case '#':
 				// Loop through white-space.
-				while(source->buffer[(*bufferpoint)++]==' ' && source->buffer[(*bufferpoint)++]=='\t');
-				switch(source->buffer[*bufferpoint]){
+				{
+					uint8_t byte;
+					while((byte=getIoBufferByte(buffer))==' ' && byte=='\t');
+				}
+				switch(getIoBufferByte(buffer)){
 					// newline means empty
 					case '\n':
 						node->token=CXX_TOKEN_PREPROCESS_EMPTY;
@@ -91,33 +96,35 @@
 	/****************
 	* See Cxxlex.h  *
 	****************/
-	CxxSyntaxError genCxxSyntaxTree(int filedesc,CxxSyntaxTreeNode **trunk){
+	CxxSyntaxError genCxxSyntaxTree(IoBuffer *buffer,CxxSyntaxTreeNode **trunk){
+		
 		// If error happens result will be changed.
 		// This is returned matter what.
 		CxxSyntaxError result=CXX_SYNTAX_SUCCESS;
 
-		// While reading the source code keep in mind the location of
-		// buffer.
-    uint32_t bufferpoint=0;
-
     // Allocate root node.
-    *tree=malloc(sizeof(CxxSyntaxTreeNode));
-    (*tree)->siblingsolder=0;
-    (*tree)->siblingsyounger=0;
-    (*tree)->parent=0;
-    (*tree)->childrenoldest=0;
-    (*tree)->childrenyoungest=(CxxSyntaxTreeNode*)&(*tree)->childrenoldest;
-    (*tree)->childlen=0;
-    (*tree)->token=CXX_TOKEN_ROOT;
-    (*tree)->spaces=0;
-    (*tree)->tabs=0;
-    (*tree)->newlines=0;
+    *trunk=malloc(sizeof(CxxSyntaxTreeNode));
+    (*trunk)->siblingsolder=0;
+    (*trunk)->siblingsyounger=0;
+    (*trunk)->parent=0;
+    (*trunk)->childrenoldest=0;
+    (*trunk)->childrenyoungest=(CxxSyntaxTreeNode*)&(*trunk)->childrenoldest;
+    (*trunk)->childlen=0;
+    (*trunk)->token=CXX_TOKEN_ROOT;
+    (*trunk)->spaces=0;
+    (*trunk)->tabs=0;
+    (*trunk)->newlines=0;
 
     // Use this variable to move along tree.
-    CxxSyntaxTreeNode *iternode=*tree;
-		do{
+    CxxSyntaxTreeNode *iternode=*trunk;
+		CxxSyntaxTreeNode *temp1=allocCxxNode();
+		while(getCxxToken(buffer,temp1)){
 
-			CxxSyntaxTreeNode *temp1=allocCxxNode();
+			// We will disable case warning not all enumeration have
+			// case. This to keep gcc output be less cluttered.
+			#pragma GCC diagnostic push
+			#pragma GCC diagnostic ignored "-Wswitch"
+
 
 			switch(temp1->token){
 			case CXX_TOKEN_DECL:
@@ -126,7 +133,9 @@
 				break;
 			}
 
-		}while(bufferpoint<source->bufferlen);
+			#pragma GCC diagnostic pop
+
+		}
 
 
 		return result;

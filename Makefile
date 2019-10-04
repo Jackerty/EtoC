@@ -5,7 +5,7 @@ CC?=gcc
 
 S:=src
 
-CFLAGS:= -Wall -std=c18 $(EXTRA_CFLAGS)
+CFLAGS:= -Wall -D_POSIX_C_SOURCE=200809L -std=c18 $(EXTRA_CFLAGS)
 
 RELEASE?=0
 ifeq ($(RELEASE),0)
@@ -16,7 +16,7 @@ else ifeq ($(RELEASE),1)
   CFLAGS+=-O3
 endif
 
-CXX_OBJECTS:= $(addprefix $(O)/,CxxMain.o CxxLex.o OpHand.o PrintTools.o ThreadTown.o)
+CXX_OBJECTS:= $(addprefix $(O)/,CxxMain.o CxxLex.o OpHand.o PrintTools.o ThreadTown.o Hash.o BufferManager.o)
 CXX_LIBS:=-pthread -lrt
 CXXEXE:=cxxtoc
 

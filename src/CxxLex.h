@@ -6,6 +6,7 @@
 #define _CXX_LEX_H_
 
 #include<stdint.h>
+#include"BufferManager.h"
 
 /***************************************
 * Syntax error that can be returned    *
@@ -45,30 +46,30 @@ typedef struct CxxSyntaxTreeNode{
 	struct CxxSyntaxTreeNode *childrenoldest;
 	struct CxxSyntaxTreeNode *childrenyoungest;
 	struct CxxSyntaxTreeNode *parent;
+  void *attribute;
 	uint32_t newlines;
   uint32_t spaces;
   uint32_t tabs;
   uint32_t childlen;
   SyntaxTreeToken token;
-  void *atttribute;
 }CxxSyntaxTreeNode;
 
-/************************************************
-* Get next C++ token from source file at         *
-* location pointed by bufferpoint and move       *
-* bufferpoint along.                             *
-************************************************/
-CxxSyntaxError getCxxToken(int fd,char **buffer,uint32_t *bufferpoint,CxxSyntaxTreeNode *node);
-/************************************************
-* Get next C++ token from source file at         *
-* location pointed by bufferpoint and move       *
-* bufferpoint along.                             *
-*************************************************/
-CxxSyntaxError genCxxSyntaxTree(int filedesc,CxxSyntaxTreeNode **trunk);
-/*************************************************
-* Release the memory allocated during            *
-* genCxxSyntaxTree.                              *
-*************************************************/
+/********************************************
+* Get next C++ token from source file at    *
+* location pointed by bufferpoint and move  *
+* bufferpoint along.                        *
+********************************************/
+CxxSyntaxError getCxxToken(IoBuffer *buffer,CxxSyntaxTreeNode *node);
+/********************************************
+* Get next C++ token from source file at    *
+* location pointed by bufferpoint and move  *
+* bufferpoint along.                        *
+********************************************/
+CxxSyntaxError genCxxSyntaxTree(IoBuffer *buffer,CxxSyntaxTreeNode **trunk);
+/********************************************
+* Release the memory allocated during       *
+* genCxxSyntaxTree.                         *
+********************************************/
 void freeCxxSyntaxTree(CxxSyntaxTreeNode *tree);
 
 

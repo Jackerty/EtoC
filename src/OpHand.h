@@ -1,6 +1,9 @@
 /********************************************************************
 * This module is general function for option handling.              *
 ********************************************************************/
+#ifndef _OP_HAND_H_
+#define _OP_HAND_H_
+
 #include<stdint.h>
 
 /*********************************************************
@@ -20,6 +23,15 @@
 #define OPHAND_PRINT 0b110
 
 /*********************************************************
+* Return value of the ophand telling  *
+*********************************************************/
+typedef enum OpHandReturn{
+	OPHAND_PROCESSING_DONE=0,
+	OPHAND_PROCESSING_STOPPED=1,
+	OPHAND_UNKNOW_OPTION=2,
+	OPHAND_NO_ARGUMENT=3,
+}OpHandReturn;
+/*********************************************************
 * Macros for the option flags.                           *
 *                                                        *
 * Members:                                               *
@@ -32,18 +44,15 @@
 *********************************************************/
 typedef struct OptionFlag{
   uint8_t argument : 1;
-  utin8_t stop : 1;
+  uint8_t stop : 1;
   uint8_t type : 6;
 }OptionFlag;
-
 /*********************************************************
 * Type for the function call if argument is hit.         *
 * Programmer should send 1 if OptFunction doesn't cause  *
 * error and 0 if error happened so that opHand can stop  *
-* if error happens during parsing.                       *
 *********************************************************/
 typedef uint8_t (*OptFunction)(char option,void *coderdata,const char *arg);
-
 /*********************************************************
 * Structure declaring option for ophand function.        *
 *********************************************************/
@@ -76,4 +85,5 @@ typedef struct Option{
 * NOTE II: args or options aren't null check so segment  *
 * faults are on you!                                     *
 *********************************************************/
-uint8_t opHand(int argn,char **args,const Option *options,uint32_t optionslen);
+OpHandReturn opHand(int argn,char **args,const Option *options,uint32_t optionslen);
+#endif /* _OP_HAND_H_ */

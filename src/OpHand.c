@@ -52,7 +52,7 @@
 	/***************
 	* See OpHand.h *
 	***************/
-	uint8_t opHand(int argn,char **args,const Option *options,uint32_t optionslen){
+	OpHandReturn opHand(int argn,char **args,const Option *options,uint32_t optionslen){
 
 		// Points to next location where loop would
 		// put non-option arguments. Used after all
@@ -76,24 +76,25 @@
 								// next string in args array.
 								if(HAS_ARGUMENT(options[foundoption].flags)){
 									// Check that next argument exist.
-                  if(++arg<argn){
+									if(++arg<argn){
 										uint8_t result=switchArgument(args[arg],options+foundoption);
 										if(result) goto jmp_OUTER_LOOP_CONTINUE;
+										else return OPHAND_PROCESSING_STOPPED;
 									}
-									break;
+									return OPHAND_NO_ARGUMENT;
 								}
 								else{
 									uint8_t result=switchNonArgument(options+foundoption);
 									if(result) goto jmp_OUTER_LOOP_CONTINUE;
-									else break;
+									else return OPHAND_PROCESSING_STOPPED;
 								}
 							}
 						}
-						goto jmp_ERROR;
+						return OPHAND_UNKNOW_OPTION;
 					}
 					else{
 						// Since two lines where given execution ends here.
-            break;
+						break;
 					}
 				}
 				else{
@@ -107,25 +108,27 @@
 									if(args[arg][2]!='\0'){
 											uint8_t result=switchArgument(args[arg]+2,options+foundoption);
 											if(result) goto jmp_OUTER_LOOP_CONTINUE;
+											else return OPHAND_PROCESSING_STOPPED;
 									}
 									else{
 										// Check that next argument exist.
 										if(++arg<argn){
 											uint8_t result=switchArgument(args[arg],options+foundoption);
 											if(result) goto jmp_OUTER_LOOP_CONTINUE;
+											else return OPHAND_PROCESSING_STOPPED;
 										}
 									}
-									break;
+									return OPHAND_NO_ARGUMENT;
 								}
 								else{
 									uint8_t result=switchNonArgument(options+foundoption);
 									if(result) goto jmp_OUTER_LOOP_CONTINUE;
-									else break;
+									else return OPHAND_PROCESSING_STOPPED;
 								}
 							}
 						}
 					}
-					goto jmp_ERROR;
+					return OPHAND_UNKNOW_OPTION;
 				}
       }
 			else args[nonoptpoint++]=args[arg];
@@ -135,9 +138,6 @@
     // Mark the ending as description wanted!
     *(args+nonoptpoint)=0;
 
-		return 1;
-
-		jmp_ERROR:
-		return 0;
+		return OPHAND_PROCESSING_DONE;
 	}
 
