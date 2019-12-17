@@ -42,12 +42,36 @@
 
 		return newchild;
 	}
+	/****************************************************************
+	* Maps token to string names.                                   *
+	****************************************************************/
+	char *getTokenStr(SyntaxTreeToken token){
+		switch(token){
+			case CXX_TOKEN_PREPROCESS_EMPTY    : return "CXX_TOKEN_PREPROCESS_EMPTY";
+			case CXX_TOKEN_PREPROCESS_INCLUDE  : return "CXX_TOKEN_PREPROCESS_INCLUDE";
+			case CXX_TOKEN_PREPROCESS_DEFINTION: return "CXX_TOKEN_PREPROCESS_DEFINTION";
+			case CXX_TOKEN_PREPROCESS_IF       : return "CXX_TOKEN_PREPROCESS_IF";
+			case CXX_TOKEN_PREPROCESS_IFDEF    : return "CXX_TOKEN_PREPROCESS_IFDEF";
+			case CXX_TOKEN_PREPROCESS_ELSE     : return "CXX_TOKEN_PREPROCESS_ELSE";
+			case CXX_TOKEN_PREPROCESS_ENDIF    : return "CXX_TOKEN_PREPROCESS_ENDIF";
+			case CXX_TOKEN_PREPROCESS_PRAGMA   : return "CXX_TOKEN_PREPROCESS_PRAGMA";
+			case CXX_TOKEN_PREPROCESS_WARNING  : return "CXX_TOKEN_PREPROCESS_WARNING";
+			case CXX_TOKEN_PREPROCESS_ERROR    : return "CXX_TOKEN_PREPROCESS_ERROR";
+			case CXX_TOKEN_PREPROCESS_MESSAGE  : return "CXX_TOKEN_PREPROCESS_MESSAGE";
+			case CXX_TOKEN_PREPROCESS_LINE     : return "CXX_TOKEN_PREPROCESS_LINE";
+			case CXX_TOKEN_COMMENT_LINE        : return "CXX_TOKEN_COMMENT_LINE"; 
+			case CXX_TOKEN_COMMENT_BLOCK       : return "CXX_TOKEN_COMMENT_BLOCK";
+			case CXX_TOKEN_DECL                : return "CXX_TOKEN_DECL";
+			case CXX_TOKEN_ROOT                : return "CXX_TOKEN_ROOT";
+		}
+	}
 	/****************
 	* See Cxxlex.h  *
 	****************/
 	CxxSyntaxError getCxxToken(IoBuffer *buffer,CxxSyntaxTreeNode *node){
 		CxxSyntaxError error=CXX_SYNTAX_SUCCESS;
-
+		uint8_t byte;
+		
 		jmp_STATISTIC_OR_EMPTY:
 		switch(getIoBufferByte(buffer)){
 			// Collect newlines, space, and tabs
@@ -63,14 +87,11 @@
 				goto jmp_STATISTIC_OR_EMPTY;
 			case '\r':
 				goto jmp_STATISTIC_OR_EMPTY;
-
+			
 			// Preprocessing symbol.
 			case '#':
 				// Loop through white-space.
-				{
-					uint8_t byte;
-					while((byte=getIoBufferByte(buffer))==' ' && byte=='\t');
-				}
+				while((byte=getIoBufferByte(buffer))==' ' && byte=='\t');
 				switch(getIoBufferByte(buffer)){
 					// newline means empty
 					case '\n':
@@ -78,19 +99,43 @@
 						break;
 					// Definition
 					case 'd':
+						node->token=CXX_TOKEN_PREPROCESS_DEFINTION;
 						break;
 					// Ether endif, else, or error
 					case 'e':
 						break;
 					// Ether include, if, or ifdef
 					case 'i':
+						if((byte=getIoBufferByte(buffer))=='f'){
+							// Ether if, or ifdef
+							if((byte=getIoBufferByte(buffer))=='d'){
+								;
+							}
+							else if(byte=' '){
+								buffer->token=CXX_TOKEN_PREPROCESS_IF;
+							}
+						}
+						else if(byte=='n'){
+							;
+						}
+						else ;
 						break;
 				}
 				break;
-
-				//
+			case 's':
+				// Ether short, sizeof, static, static_assert, static_cast, struct,
+				//       switch, synchronized
+				switch(getIoBufferByte(buffer)){
+					case 't':
+						if(checkIoBufferStr(buffer,"ruct")==);
+						break;
+				}
+				break;
+			// No more input.
+			case 0:
+			return CXX_NO_MORE_INPUT;
 		}
-
+		consumeIoBuffer(buffer);
 		return CXX_SYNTAX_SUCCESS;
 	}
 	/****************
@@ -98,45 +143,53 @@
 	****************/
 	CxxSyntaxError genCxxSyntaxTree(IoBuffer *buffer,CxxSyntaxTreeNode **trunk){
 		
-		// If error happens result will be changed.
-		// This is returned matter what.
 		CxxSyntaxError result=CXX_SYNTAX_SUCCESS;
+		if(fullReadIoBuffer(buffer)==0){
+		
+			// If error happens result will be changed.
+			// This is returned matter what.
+			
+			// Allocate root node.
+			*trunk=malloc(sizeof(CxxSyntaxTreeNode));
+			(*trunk)->siblingsolder=0;
+			(*trunk)->siblingsyounger=0;
+			(*trunk)->parent=0;
+			(*trunk)->childrenoldest=0;
+			(*trunk)->childrenyoungest=(CxxSyntaxTreeNode*)&(*trunk)->childrenoldest;
+			(*trunk)->childlen=0;
+			(*trunk)->token=CXX_TOKEN_ROOT;
+			(*trunk)->spaces=0;
+			(*trunk)->tabs=0;
+			(*trunk)->newlines=0;
+			
+			// Use this variable to move along tree.
+			CxxSyntaxTreeNode *iternode=*trunk;
+			CxxSyntaxTreeNode *temp1=allocCxxNode();
+			// Make sure that fullread has been done in kernel side.
+			waitResponseIoBuffer(buffer);
+			if(buffer->length>0){
+				while(getCxxToken(buffer,temp1)==CXX_SYNTAX_SUCCESS){
+				
+					printf("%s\n",getTokenStr(temp1->token));
+					// We will disable case warning not all enumeration have
+					// case. This to keep gcc output be less cluttered.
+					#pragma GCC diagnostic push
+					#pragma GCC diagnostic ignored "-Wswitch"
 
-    // Allocate root node.
-    *trunk=malloc(sizeof(CxxSyntaxTreeNode));
-    (*trunk)->siblingsolder=0;
-    (*trunk)->siblingsyounger=0;
-    (*trunk)->parent=0;
-    (*trunk)->childrenoldest=0;
-    (*trunk)->childrenyoungest=(CxxSyntaxTreeNode*)&(*trunk)->childrenoldest;
-    (*trunk)->childlen=0;
-    (*trunk)->token=CXX_TOKEN_ROOT;
-    (*trunk)->spaces=0;
-    (*trunk)->tabs=0;
-    (*trunk)->newlines=0;
+					switch(temp1->token){
+					case CXX_TOKEN_DECL:
+						break;
+					case CXX_TOKEN_COMMENT_BLOCK:
+						break;
+					}
 
-    // Use this variable to move along tree.
-    CxxSyntaxTreeNode *iternode=*trunk;
-		CxxSyntaxTreeNode *temp1=allocCxxNode();
-		while(getCxxToken(buffer,temp1)){
+					#pragma GCC diagnostic pop
 
-			// We will disable case warning not all enumeration have
-			// case. This to keep gcc output be less cluttered.
-			#pragma GCC diagnostic push
-			#pragma GCC diagnostic ignored "-Wswitch"
-
-
-			switch(temp1->token){
-			case CXX_TOKEN_DECL:
-				break;
-			case CXX_TOKEN_COMMENT_BLOCK:
-				break;
+				}
 			}
-
-			#pragma GCC diagnostic pop
-
+			else result=CXX_SYNTAX_BUFFER_ERROR;
 		}
-
+		else result=CXX_SYNTAX_BUFFER_ERROR;
 
 		return result;
 	}

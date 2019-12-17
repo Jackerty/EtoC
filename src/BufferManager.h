@@ -10,7 +10,8 @@
 	// Check that linux version supports io_uring.
 	#include<linux/version.h>
 	#if LINUX_VERSION_CODE>=KERNEL_VERSION(5,1,0)
-		#include<linux/io_uring.h>	
+		#include<sys/uio.h>
+		#include<linux/io_uring.h>
 	#endif
 #endif /* __linux__ */
 
@@ -21,9 +22,12 @@
 ***************************************/
 #if LINUX_VERSION_CODE>=KERNEL_VERSION(5,1,0)
 typedef struct IoBuffer{
-	uint8_t buffer1[4096];
-	uint8_t buffer2[4096];
-	int fd;
+	struct io_uring_sqe *constsqe;
+	int32_t buffpoint;
+	int32_t forwardhead;
+	int32_t length;
+	uint8_t buffers[2*4096];
+	struct iovec vec;
 }IoBuffer;
 #else
 typedef struct IoBuffer{
@@ -35,37 +39,58 @@ typedef struct IoBuffer{
 /***************************************
 * Initialize the buffer manager.       *
 ***************************************/
-int initIoBufferManager();
+int initIoBufferManager(uint16_t numberofbuffers,IoBuffer **buffers);
 /***************************************
 * Deallocate any memory associated     *
 * with BufferManager.                  *
 ***************************************/
-int deinitIoBufferManager();
+int deinitIoBufferManager(IoBuffer *buffers);
 /***************************************
 * Allocate new buffer to be used in IO *
 * buffer.                              *
 ***************************************/
-int allocIoBuffer(IoBuffer *buff,size_t bufferlength);
+int prepIoBufferForRead(IoBuffer *buff);
 /***************************************
-* Change file desciption of the        *
+* Allocate new buffer to be used in IO *
 * buffer.                              *
 ***************************************/
-inline void changeFdIoBuffer(IoBuffer *buff,int fd){
-	buff->fd=fd;
-}
+int prepIoBufferForWrite(IoBuffer *buff);
 /***************************************
-* Get next byte from the buffer.       *
+* Read buffer to the full. This        *
+* function is ment to be called before *
+* asking bytes or string checking as   *
+* initialization call.                 *
+***************************************/
+int fullReadIoBuffer(IoBuffer *buffer);
+/***************************************
+* Sometimes you have to check that     *
+* kernel has responded.                *
+***************************************/
+void waitResponseIoBuffer(IoBuffer *buffer);
+/***************************************
+* Get next byte of the buffer.         *
 ***************************************/
 uint8_t getIoBufferByte(IoBuffer *buffer);
 /***************************************
-* Get next 4 byte integer from the     *
-* buffer.                              *
+* Check next string.                   *
 ***************************************/
-uint32_t getIoBuffer4Byte(IoBuffer *buffer);
+uint8_t checkIoBufferStr(IoBuffer *restrict buffer,uint8_t *restrict str);
 /***************************************
-* Get next 4 byte integer from the     *
-* buffer.                              *
+* Comsume the what was read without    *
+* returning the string.                *
 ***************************************/
-uint64_t getIoBuffer8Byte(IoBuffer *buffer);
+uint8_t consumeIoBuffer(IoBuffer *buffer);
+/***************************************
+* Consume the what was read with       *
+* returing the copy of it.             *
+***************************************/
+uint8_t consumeCpyIoBuffer(IoBuffer *restrict buffer,uint8_t *str);
+	/***************************************
+	* Set the file descriptor without      *
+	* knowing buffers insides.             *
+	***************************************/
+	static inline void setIoBufferFd(IoBuffer *buffer,int fd){
+		buffer->constsqe->fd=fd;
+	}
 
 #endif /* _BUFFER_MANAGER_H_ */

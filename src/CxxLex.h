@@ -14,7 +14,8 @@
 ***************************************/
 typedef enum CxxSyntaxError{
 	CXX_SYNTAX_SUCCESS,
-	CXX_SYNTAX_
+	CXX_NO_MORE_INPUT,
+	CXX_SYNTAX_BUFFER_ERROR,
 }CxxSyntaxError;
 /****************************************
 * Syntax tree tokens.                   *
@@ -22,20 +23,20 @@ typedef enum CxxSyntaxError{
 typedef enum SyntaxTreeToken{
 	CXX_TOKEN_PREPROCESS_EMPTY,
 	CXX_TOKEN_PREPROCESS_INCLUDE,
-  CXX_TOKEN_PREPROCESS_DEFINTION,
-  CXX_TOKEN_PREPROCESS_IF,
-  CXX_TOKEN_PREPROCESS_IFDEF,
-  CXX_TOKEN_PREPROCESS_ELSE,
-  CXX_TOKEN_PREPROCESS_ENDIF,
-  CXX_TOKEN_PREPROCESS_PRAGMA,
-  CXX_TOKEN_PREPROCESS_WARNING,
-  CXX_TOKEN_PREPROCESS_ERROR,
-  CXX_TOKEN_PREPROCESS_MESSAGE,
-  CXX_TOKEN_PREPROCESS_LINE,
-  CXX_TOKEN_COMMENT_LINE,
-  CXX_TOKEN_COMMENT_BLOCK,
-  CXX_TOKEN_DECL,
-  CXX_TOKEN_ROOT,
+	CXX_TOKEN_PREPROCESS_DEFINTION,
+	CXX_TOKEN_PREPROCESS_IF,
+	CXX_TOKEN_PREPROCESS_IFDEF,
+	CXX_TOKEN_PREPROCESS_ELSE,
+	CXX_TOKEN_PREPROCESS_ENDIF,
+	CXX_TOKEN_PREPROCESS_PRAGMA,
+	CXX_TOKEN_PREPROCESS_WARNING,
+	CXX_TOKEN_PREPROCESS_ERROR,
+	CXX_TOKEN_PREPROCESS_MESSAGE,
+	CXX_TOKEN_PREPROCESS_LINE,
+	CXX_TOKEN_COMMENT_LINE,
+	CXX_TOKEN_COMMENT_BLOCK,
+	CXX_TOKEN_DECL,
+	CXX_TOKEN_ROOT
 }SyntaxTreeToken;
 /**************************************
 * Structure for abstract syntax tree. *
@@ -46,12 +47,12 @@ typedef struct CxxSyntaxTreeNode{
 	struct CxxSyntaxTreeNode *childrenoldest;
 	struct CxxSyntaxTreeNode *childrenyoungest;
 	struct CxxSyntaxTreeNode *parent;
-  void *attribute;
+	void *attribute;
 	uint32_t newlines;
-  uint32_t spaces;
-  uint32_t tabs;
-  uint32_t childlen;
-  SyntaxTreeToken token;
+	uint32_t spaces;
+	uint32_t tabs;
+	uint32_t childlen;
+	SyntaxTreeToken token;
 }CxxSyntaxTreeNode;
 
 /********************************************

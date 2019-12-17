@@ -76,7 +76,7 @@ uint32_t numberofwaiters;
 	* "Finds" next job for the worker.     *
 	* Parameter is the town.               *
 	***************************************/
-	static void *workFinder(void* null){
+	static void *workFinder(void* workerinfo){
 		// Current job pointer.
 		ThreadTownJob *currentjob;
 		// To make sure that stop isn't called before
@@ -120,8 +120,9 @@ uint32_t numberofwaiters;
 
 			// Execute the job
 			//TODO: Returns void*!!!
-			currentjob->func(currentjob->param);
+			currentjob->func(currentjob->param,workerinfo);
 		}
+		return 0;
 	}
 	/*******************
 	* See ThreadTown.h *
@@ -133,9 +134,7 @@ uint32_t numberofwaiters;
 		// Note that current thread is calculate as member of the townpopulation.
 		workers=malloc((townpopulation-1)*sizeof(pthread_t));
 		if(workers){
-
-			static_assert(offsetof(ThreadTownJob,next)==0,"ERROR: Assumed that ThreadTownJob member next is offset zero!");
-
+			
 			jobqueue=(ThreadTownJob*)&jobqueue;
 			jobqueuelast=(ThreadTownJob*)&jobqueue;
 		}
@@ -148,20 +147,20 @@ uint32_t numberofwaiters;
 	/*******************
 	* See ThreadTown.h *
 	*******************/
-	void *populateThreadTown(){
+	void *populateThreadTown(void **byworkerinfo){
 
 		// Make sure that wokers aren't stopping!
 		stop=0;
 		numberofwaiters=townpopulation+1;
 
 		// Note that current thread is calculate as member of the townpopulation.
-    for(uint32_t worker=0;worker<townpopulation-1;worker++){
-			if(pthread_create(&workers[worker],0,workFinder,0)!=0){
+		for(uint32_t worker=0;worker<townpopulation-1;worker++){
+			if(pthread_create(&workers[worker],0,workFinder,byworkerinfo+worker)!=0){
 				return 0;
 			}
-    }
+		}
 
-		return workFinder(0);
+		return workFinder(byworkerinfo+townpopulation-1);
 
 	}
 	/*******************

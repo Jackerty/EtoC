@@ -10,7 +10,7 @@
 /*****************************************
 * Work function for worker to do/call.   *
 *****************************************/
-typedef void *(*ThreadTownWork)(void*);
+typedef void *(*ThreadTownWork)(void*,void*);
 /*****************************************
 * Work queue node.                       *
 *****************************************/
@@ -31,7 +31,7 @@ void buildThreadTown(uint32_t population);
 * caller thread. This functions returns      *
 * result of caller worker return value.      *
 *********************************************/
-void *populateThreadTown();
+void *populateThreadTown(void **byworkerinfo);
 /*********************************************
 * Destroy Thread Town and all of the memory  *
 * remaining at the queue.                    *

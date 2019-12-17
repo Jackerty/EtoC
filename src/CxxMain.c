@@ -10,6 +10,7 @@
 #include<ctype.h>
 #include"OpHand.h"
 #include"PrintTools.h"
+#include"BufferManager.h"
 #include"ThreadTown.h"
 #include"Hash.h"
 #include"CxxLex.h"
@@ -53,9 +54,10 @@ HashTable FileTable;
   * Job to build syntax tree from given      *
   * file.                                    *
   *******************************************/
-	void *orderGenSyntaxTree(void* param){
+	void *orderGenSyntaxTree(void* param,void *threadinfo){
 		// Cast the parameter to actual parameters.
 		char *file=param;
+		IoBuffer *buffer=threadinfo;
 
 		// Check that file isn't opened yet
 		// by checking hashmap entry doesn't exist.
@@ -66,17 +68,19 @@ HashTable FileTable;
 			HashEntry *entry=malloc(sizeof(HashEntry));
 			entry->key=file;
 			addHashTableEntry(&FileTable,entry);
-		}
-		// File description.
-    int fd;
-
+		}	
+		
 		// Check that file exists by opening file descriptor.
+		int fd;
 		if((fd=open(file,O_RDONLY))>-1){
+			setIoBufferFd(buffer,fd);
 			posix_fadvise(fd,0,0,POSIX_FADV_SEQUENTIAL);
 
 			// Call the generator.
-			IoBuffer buffer;
-
+			CxxSyntaxTreeNode *trunk;
+			if(genCxxSyntaxTree(buffer,&trunk)!=CXX_SYNTAX_SUCCESS){
+				printconst(STDERR_FILENO,"Error in genCxxSyntaxTree!\n");
+			}
 			// We are done reading the file so close
 			close(fd);
 
@@ -124,6 +128,7 @@ HashTable FileTable;
 		//*** INITIALIZATION ***//
 		//**LOAD CONFIGURATION **//
 		// TODO: Configuration file!
+		//       Use libconfig.
 
 		//** HANDLE ARGUMENTS **//
     const Option argops[]={
@@ -144,7 +149,7 @@ HashTable FileTable;
 
 					//** BUILD TOWN FOR THREAD WORKERS **//
 					if(!threadnum){
-						uint32_t cpucount=sysconf(_SC_NPROCESSORS_ONLN);
+						int32_t cpucount=sysconf(_SC_NPROCESSORS_ONLN);
 						threadnum=cpucount;
 					}
 					buildThreadTown(threadnum);
@@ -178,15 +183,16 @@ HashTable FileTable;
 					// Initialize buffer memory size per buffer
 					// to 4096 since most harddisk have that as block size
 					// or something that divisions 4096.
-					if(initIoBufferManager(4096,threadnum)==0){
+					IoBuffer *buffers;
+					if(initIoBufferManager(threadnum,&buffers)==0){
 
 						// Initialize hash table keep track source files.
 						// filecount is doubled as initialize size of the
 						// table because headers aren't meant to be listed.
 						if(initHashTable(&FileTable,filecount*2)==0){
-							
+						
 							//** START COMPILING THREADS **//
-							void *callerreturn=populateThreadTown();
+							void *callerreturn=populateThreadTown((void**)buffers);
 							void **restofresults=burnThreadTown();
 
 							//*** HANDLE RETURN VALUES ***//
@@ -196,7 +202,7 @@ HashTable FileTable;
 							destroyHashTable(&FileTable);
 						}
 						else printconst(STDERR_FILENO,"main.c | initHashTable | error!\n");
-						deinitIoBufferManager();
+						deinitIoBufferManager(buffers);
 					}
 					else printconst(STDERR_FILENO,"main.c | IO buffer | error!\n");
 				}
