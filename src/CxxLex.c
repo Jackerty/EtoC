@@ -6,6 +6,13 @@
 #include"BufferManager.h"
 #include"CxxLex.h"
 
+/****************************************************************
+* Constant array for ends of the keywords in C++. Maybe little  *
+* less memory usage since no null ending. Also sizeof can be    *
+* used to get length of the rest of the structure.              *
+****************************************************************/
+static const uint8_t EndStruct[]={'r','u','c','t'}; 
+
 	/****************************************************************
 	* Allocate C++ syntax tree node.                                *
 	****************************************************************/
@@ -111,8 +118,8 @@
 							if((byte=getIoBufferByte(buffer))=='d'){
 								;
 							}
-							else if(byte=' '){
-								buffer->token=CXX_TOKEN_PREPROCESS_IF;
+							else if(byte==' ' && byte=='\t'){
+								node->token=CXX_TOKEN_PREPROCESS_IF;
 							}
 						}
 						else if(byte=='n'){
@@ -127,13 +134,21 @@
 				//       switch, synchronized
 				switch(getIoBufferByte(buffer)){
 					case 't':
-						if(checkIoBufferStr(buffer,"ruct")==);
+						if(checkIoBufferStr(buffer,EndStruct,sizeof(EndStruct))==0);
+						node->token=CXX_TOKEN_STRUCT;
 						break;
 				}
 				break;
 			// No more input.
 			case 0:
-			return CXX_NO_MORE_INPUT;
+				return CXX_NO_MORE_INPUT;
+			// Default here means identifier not a keyword.
+			// We have jmp in it so that if we have 
+			// identifier that starts with keywords (or 
+			// lookalike) we can jump in.
+			default:
+			jmp_WAS_IDENTIFIER:
+				;
 		}
 		consumeIoBuffer(buffer);
 		return CXX_SYNTAX_SUCCESS;

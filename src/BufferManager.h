@@ -72,9 +72,11 @@ void waitResponseIoBuffer(IoBuffer *buffer);
 ***************************************/
 uint8_t getIoBufferByte(IoBuffer *buffer);
 /***************************************
-* Check next string.                   *
+* Check next string is in buffer.      *
+* Returns 1 if str is found from the   *
+* buffer. Returns 0 otherwise.         *
 ***************************************/
-uint8_t checkIoBufferStr(IoBuffer *restrict buffer,uint8_t *restrict str);
+uint8_t checkIoBufferStr(IoBuffer *restrict buffer,const uint8_t *restrict str,int32_t length);
 /***************************************
 * Comsume the what was read without    *
 * returning the string.                *

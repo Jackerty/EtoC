@@ -73,6 +73,9 @@ static uint16_t numberOfBuffers;
 * (expected one).                             *
 **********************************************/
 static uint32_t expected;
+/**********************************************
+* State array for each buffer.                *
+**********************************************/
 static atomic_int_fast8_t *ready;
 /**********************************************
 * Flag bit do we use sqpolling.               *
@@ -309,10 +312,15 @@ static union{
 	* See BufferManager.h *
 	**********************/
 	int fullReadIoBuffer(IoBuffer *buffer){
+		// For first read we can read both buffers
+		// Set iovec to longer.
 		buffer->vec.iov_base=buffer->buffers;
 		buffer->vec.iov_len=sizeof(buffer->buffers);
+		// Set length of the read to zero.
+		// This is mostly so that old data is not left hanging.
 		buffer->length=0;
 		int result=sendIoBuffer(buffer);
+		// Now we have 
 		buffer->vec.iov_len=sizeof(buffer->buffers)/2;
 		return result;
 	}
@@ -324,9 +332,12 @@ static union{
 		// at the initIoBufferManager.
 		#pragma GCC diagnostic push
 		#pragma GCC diagnostic ignored "-Wsequence-point"
+		// We check that state isn't last read.
+		// Special handle last read since we should
+		// worry about not over reading.
 		if(ready[buffer->constsqe->user_data]!=-1){
 			buffer->forwardhead=(buffer->forwardhead++)&sizeof(buffer->buffers);
-			if(buffer->forwardhead==sizeof(buffer->buffers) && buffer->forwardhead==0){
+			if(buffer->forwardhead==sizeof(buffer->buffers)/2 || buffer->forwardhead==0){
 				buffer->length-=sizeof(buffer->buffers)/2;
 				waitResponseIoBuffer(buffer);
 				if(buffer->length<=0) return 0;
@@ -339,16 +350,24 @@ static union{
 	/**********************
 	* See BufferManager.h *
 	**********************/
-	uint8_t checkIoBufferStr(IoBuffer *restrict buffer,uint8_t *restrict str,int32_t length){
+	uint8_t checkIoBufferStr(IoBuffer *restrict buffer,const uint8_t *restrict str,int32_t length){
+		// Check that we keep in the bounds of the buffers.
 		if(length+buffer->forwardhead<sizeof(buffer->buffers)){
-			if(strncmp(buffer->buffers[buffer->forwardhead],str,length)==0){
+			// We can just compare since our string fit remainder
+			// of the buffer.
+			if(memcmp(buffer->buffers+buffer->forwardhead,str,length)==0){
 				if(getIoBufferByte(buffer)==' '){
-					
+					return 1;
 				}
 			}
 		}
 		else{
-			;
+			// We have to read more then we have buffer. 
+			size_t remainder=sizeof(buffer->buffers)-buffer->forwardhead;
+			if(memcmp(buffer->buffers+buffer->forwardhead,str,remainder)==0){
+				;
+				;
+			}
 		}
 		return 0;
 	}
