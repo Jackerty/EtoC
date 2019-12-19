@@ -30,6 +30,7 @@
 #include<errno.h>
 #include<stdatomic.h>
 #include<pthread.h>
+#include<ctype.h>
 
 	/**********************************************
 	* Since we are using linux system calls       *
@@ -308,6 +309,18 @@ static union{
 			}
 		}
 	}
+	/**********************************************
+	* waitResponseIoBuffer function but decrement *
+	* used buffers size. Is used internally in    *
+	* module to keep length in check and check    *
+	* next buffer amount has been read.           *
+	* Should be called before reading  next       *
+	* buffer.                                     *
+	**********************************************/
+	static inline void changeIoBuffer(IoBuffer *buffer){
+		buffer->length-=sizeof(buffer->buffers)/2;
+		waitResponseIoBuffer(buffer);
+	}
 	/**********************
 	* See BufferManager.h *
 	**********************/
@@ -334,12 +347,11 @@ static union{
 		#pragma GCC diagnostic ignored "-Wsequence-point"
 		// We check that state isn't last read.
 		// Special handle last read since we should
-		// worry about not over reading.
+		// worry about over reading.
 		if(ready[buffer->constsqe->user_data]!=-1){
 			buffer->forwardhead=(buffer->forwardhead++)&(sizeof(buffer->buffers)-1);
 			if(buffer->forwardhead==sizeof(buffer->buffers)/2 || buffer->forwardhead==0){
-				buffer->length-=sizeof(buffer->buffers)/2;
-				waitResponseIoBuffer(buffer);
+				changeIoBuffer(buffer);
 				if(buffer->length<=0) return 0;
 			}
 		}
@@ -355,11 +367,15 @@ static union{
 		// Since forwardhead keeps track both buffers at the same time
 		// we have to ask how much we offset in current buffer.
 		// We use and rather then modulos for speed since
-		// our buffer size has is power 2.
-		if(length+(buffer->forwardhead&(sizeof(buffer->buffers)/2)-1)<sizeof(buffer->buffers)/2){
+		// our buffer size is power 2.
+		//TODO: Should memcmp move forwardhead
+		//      amount that memcmp says there is
+		//      agreement when memcmp fails?
+		if(length+(buffer->forwardhead&((sizeof(buffer->buffers)/2)-1))<sizeof(buffer->buffers)/2){
 			// We can just compare since our string fit remainder
 			// of the buffer.
 			if(memcmp(buffer->buffers+buffer->forwardhead,str,length)==0){
+				//TODO: We have to worry about over reading! 
 				buffer->forwardhead+=length;
 				if(isspace(buffer->buffers[buffer->forwardhead])){
 					return 1;
@@ -373,9 +389,27 @@ static union{
 			size_t remainder=sizeof(buffer->buffers)-buffer->forwardhead;
 			if(memcmp(buffer->buffers+buffer->forwardhead,str,remainder)==0){
 				// Buffer is used so make sure that new buffer is read.
-				
-				size_t rest=length-remainder;
-				if();
+				// Then read variable rest amount of new buffer.
+				changeIoBuffer(buffer);
+				if(buffer->length>0){
+					size_t rest=length-remainder;
+					if(memcmp(buffer->buffers+buffer->forwardhead,str+remainder,rest)==0){
+						// We just changed to buffer so we don't need
+						// to worry about forwardhead going beyond 
+						// buffers.
+						// Assumption here is that no one would put
+						// string bigger then buffer.
+						buffer->forwardhead+=length;
+						if(isspace(buffer->buffers[buffer->forwardhead])){
+							return 1;
+						}
+					}
+				}
+				// We don't have more buffer to read?
+				// TODO: Error report?? Do we have to
+				//       tell caller to stop calling
+				//       buffer manager about this
+				//       file??
 			}
 		}
 		return 0;
