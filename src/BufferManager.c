@@ -336,7 +336,7 @@ static union{
 		// Special handle last read since we should
 		// worry about not over reading.
 		if(ready[buffer->constsqe->user_data]!=-1){
-			buffer->forwardhead=(buffer->forwardhead++)&sizeof(buffer->buffers);
+			buffer->forwardhead=(buffer->forwardhead++)&(sizeof(buffer->buffers)-1);
 			if(buffer->forwardhead==sizeof(buffer->buffers)/2 || buffer->forwardhead==0){
 				buffer->length-=sizeof(buffer->buffers)/2;
 				waitResponseIoBuffer(buffer);
@@ -351,22 +351,31 @@ static union{
 	* See BufferManager.h *
 	**********************/
 	uint8_t checkIoBufferStr(IoBuffer *restrict buffer,const uint8_t *restrict str,int32_t length){
-		// Check that we keep in the bounds of the buffers.
-		if(length+buffer->forwardhead<sizeof(buffer->buffers)){
+		// Check that we keep in the bounds of the buffer.
+		// Since forwardhead keeps track both buffers at the same time
+		// we have to ask how much we offset in current buffer.
+		// We use and rather then modulos for speed since
+		// our buffer size has is power 2.
+		if(length+(buffer->forwardhead&(sizeof(buffer->buffers)/2)-1)<sizeof(buffer->buffers)/2){
 			// We can just compare since our string fit remainder
 			// of the buffer.
 			if(memcmp(buffer->buffers+buffer->forwardhead,str,length)==0){
-				if(getIoBufferByte(buffer)==' '){
+				buffer->forwardhead+=length;
+				if(isspace(buffer->buffers[buffer->forwardhead])){
 					return 1;
 				}
 			}
 		}
 		else{
-			// We have to read more then we have buffer. 
+			// We have to read more then we have buffer.
+			// Check buffer amount first and then on second
+			// read check new buffer.
 			size_t remainder=sizeof(buffer->buffers)-buffer->forwardhead;
 			if(memcmp(buffer->buffers+buffer->forwardhead,str,remainder)==0){
-				;
-				;
+				// Buffer is used so make sure that new buffer is read.
+				
+				size_t rest=length-remainder;
+				if();
 			}
 		}
 		return 0;
