@@ -11,7 +11,7 @@
 * less memory usage since no null ending. Also sizeof can be    *
 * used to get length of the rest of the structure.              *
 ****************************************************************/
-static const uint8_t EndStruct[]={'r','u','c','t'}; 
+static const uint8_t EndStruct[]={'u','c','t'}; 
 
 	/****************************************************************
 	* Allocate C++ syntax tree node.                                *
@@ -134,8 +134,11 @@ static const uint8_t EndStruct[]={'r','u','c','t'};
 				//       switch, synchronized
 				switch(getIoBufferByte(buffer)){
 					case 't':
-						if(checkIoBufferStr(buffer,EndStruct,sizeof(EndStruct))==0);
-						node->token=CXX_TOKEN_STRUCT;
+						// Ether static_assert, static_cast, or struct
+						if(getIoBufferByte(buffer)=='r'){
+							if(checkIoBufferStr(buffer,EndStruct,sizeof(EndStruct))==0);
+							node->token=CXX_TOKEN_STRUCT;
+						}
 						break;
 				}
 				break;

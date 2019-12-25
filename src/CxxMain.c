@@ -201,10 +201,10 @@ HashTable FileTable;
 							free(restofresults);
 							destroyHashTable(&FileTable);
 						}
-						else printconst(STDERR_FILENO,"main.c | initHashTable | error!\n");
+						else printconst(STDERR_FILENO,"CxxMain.c | initHashTable | error!\n");
 						deinitIoBufferManager(buffers);
 					}
-					else printconst(STDERR_FILENO,"main.c | IO buffer | error!\n");
+					else printconst(STDERR_FILENO,"CxxMain.c | IO buffer | error!\n");
 				}
 				else{
 					printconst(STDOUT_FILENO,"No source files given!\n");

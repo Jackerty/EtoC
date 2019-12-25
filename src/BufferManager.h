@@ -94,5 +94,14 @@ uint8_t consumeCpyIoBuffer(IoBuffer *restrict buffer,uint8_t *str);
 	static inline void setIoBufferFd(IoBuffer *buffer,int fd){
 		buffer->constsqe->fd=fd;
 	}
+	/***************************************
+	* Check next byte without moving       *
+	* reading head.                        *
+	***************************************/
+	static inline uint8_t checkByteIoBuffer(const IoBuffer *buffer){
+		// We just need to give byte at index forwardhead since
+		// other functions move head to next byte.		
+		return buffer->buffers[buffer->forwardhead];
+	}
 
 #endif /* _BUFFER_MANAGER_H_ */

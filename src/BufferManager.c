@@ -7,6 +7,7 @@
 #include<string.h>
 #include<unistd.h>
 #include"BufferManager.h"
+#include"Etc.h"
 #ifdef __linux__
 	#include<linux/version.h>
 #endif /* __linux__ */
@@ -375,9 +376,17 @@ static union{
 			// We can just compare since our string fit remainder
 			// of the buffer.
 			if(memcmp(buffer->buffers+buffer->forwardhead,str,length)==0){
-				//TODO: We have to worry about over reading! 
-				buffer->forwardhead+=length;
-				if(isspace(buffer->buffers[buffer->forwardhead])){
+				// We are plussing one so that we are going to next letter.
+				if(length+1+(buffer->forwardhead&((sizeof(buffer->buffers)/2)-1))>=sizeof(buffer->buffers)/2){
+					// TODO: How to retport error??					
+					changeIoBuffer(buffer);
+					if(buffer->length<0) return 0;
+				}
+				buffer->forwardhead+=length+1;
+				buffer->forwardhead&=sizeof(buffer->buffers)-1;
+
+				// Check that there isn't more letters for identifier.
+				if(!isAlNumUnder(checkByteIoBuffer(buffer))){
 					return 1;
 				}
 			}
@@ -386,23 +395,31 @@ static union{
 			// We have to read more then we have buffer.
 			// Check buffer amount first and then on second
 			// read check new buffer.
-			size_t remainder=sizeof(buffer->buffers)-buffer->forwardhead;
+			size_t remainder=sizeof(buffer->buffers)/2-buffer->forwardhead;
 			if(memcmp(buffer->buffers+buffer->forwardhead,str,remainder)==0){
 				// Buffer is used so make sure that new buffer is read.
 				// Then read variable rest amount of new buffer.
 				changeIoBuffer(buffer);
 				if(buffer->length>0){
-					size_t rest=length-remainder;
+					// Update forwardhead to start of new buffer.
+					// We do this by modulus which. Since buffer
+					// size power of two we can use faster and 
+					// minus one modulus.
+					buffer->forwardhead+=remainder;
+					buffer->forwardhead&=sizeof(buffer->buffers)-1;
+					// Let's make rest variable so that we have easier
+					// time to compare middle of the string.
+					const size_t rest=length-remainder;
 					if(memcmp(buffer->buffers+buffer->forwardhead,str+remainder,rest)==0){
-						// We just changed to buffer so we don't need
-						// to worry about forwardhead going beyond 
-						// buffers.
-						// Assumption here is that no one would put
-						// string bigger then buffer.
-						buffer->forwardhead+=length;
-						if(isspace(buffer->buffers[buffer->forwardhead])){
+						// We are reading length plus one since we are going
+						// to next character. We just changed to buffer we 
+						// don't have to worry that over reading.
+						buffer->forwardhead+=length+1;
+					
+						// Check that there isn't more letter for identifier.
+						if(!isAlNumUnder(checkByteIoBuffer(buffer))){
 							return 1;
-						}
+						}						
 					}
 				}
 				// We don't have more buffer to read?
