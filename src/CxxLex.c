@@ -51,6 +51,7 @@ static const uint8_t EndStruct[]={'u','c','t'};
 	}
 	/****************************************************************
 	* Maps token to string names.                                   *
+	* This function is mostle for debugging.                        *
 	****************************************************************/
 	char *getTokenStr(SyntaxTreeToken token){
 		switch(token){
@@ -70,6 +71,7 @@ static const uint8_t EndStruct[]={'u','c','t'};
 			case CXX_TOKEN_COMMENT_BLOCK       : return "CXX_TOKEN_COMMENT_BLOCK";
 			case CXX_TOKEN_DECL                : return "CXX_TOKEN_DECL";
 			case CXX_TOKEN_ROOT                : return "CXX_TOKEN_ROOT";
+			case CXX_TOKEN_STRUCT              : return "CXX_TOKEN_STRUCT";
 		}
 	}
 	/****************
@@ -126,9 +128,9 @@ static const uint8_t EndStruct[]={'u','c','t'};
 							;
 						}
 						else ;
-						break;
+						goto jmp_WAS_IDENTIFIER;
 				}
-				break;
+				goto jmp_WAS_IDENTIFIER;
 			case 's':
 				// Ether short, sizeof, static, static_assert, static_cast, struct,
 				//       switch, synchronized
@@ -136,12 +138,13 @@ static const uint8_t EndStruct[]={'u','c','t'};
 					case 't':
 						// Ether static_assert, static_cast, or struct
 						if(getIoBufferByte(buffer)=='r'){
-							if(checkIoBufferStr(buffer,EndStruct,sizeof(EndStruct))==0);
+							if(checkIoBufferStr(buffer,EndStruct,sizeof(EndStruct))==0) goto jmp_WAS_IDENTIFIER;
 							node->token=CXX_TOKEN_STRUCT;
+							break;
 						}
-						break;
+						goto jmp_WAS_IDENTIFIER;
 				}
-				break;
+				goto jmp_WAS_IDENTIFIER;
 			// No more input.
 			case 0:
 				return CXX_NO_MORE_INPUT;
@@ -151,7 +154,7 @@ static const uint8_t EndStruct[]={'u','c','t'};
 			// lookalike) we can jump in.
 			default:
 			jmp_WAS_IDENTIFIER:
-				;
+			node->token=CXX_TOKEN_IDENTIDIER;
 		}
 		consumeIoBuffer(buffer);
 		return CXX_SYNTAX_SUCCESS;
