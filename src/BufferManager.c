@@ -37,15 +37,21 @@
 	* Since we are using linux system calls       *
 	* diectly let's make easy to use static       *
 	* inlines of these functions. Look liburing's *
-	* syscall.c for descriptions.                 *
+	* syscall.c for descriptions. Don't use       *
+	* underscore naming so that that if someone   *
+	* puts system calls declearation header no    *
+	* conflict arises.                            *
 	**********************************************/
 	static inline int ioUringSetup(unsigned int entries,struct io_uring_params *p){
 		return syscall(__NR_io_uring_setup,entries,p);
 	}
+	static inline int ioUringRegister(int fd,unsigned int opcode,const void *arg,unsigned nr_args){
+		return syscall(__NR_io_uring_register,fd,opcode,arg,nr_args);
+	}
 	static inline int ioUringEnter(int fd,unsigned int numsubmit,unsigned int mincompl,unsigned int flags,sigset_t *sig){ 
 		// Last parameter has something to do with signals.
 		return syscall(__NR_io_uring_enter,fd,numsubmit,mincompl,flags,sig,_NSIG/8);
-	}
+	} 
 /**********************************************
 * File descriptor of io_uring and uring       *
 * parameters.                                 *
@@ -278,14 +284,21 @@ static union{
 		// right location in ready array.
 		volatile uint32_t sqeindex=buffer->constsqe->user_data;
 		if(ready[sqeindex]==0){
-			
+			// This mutex makes sure only one thread handles
+			// response queue. One that get's the lock will
+			// handle every single one it sees.
+			// TODO: Is there theoritically possible to get
+			//       response so late that mutex lock should
+			//       check in the while loop other treads
+			//       are spinning. Or should we make this
+			//       more friendlier to multiple threads.
 			if(pthread_mutex_trylock(&testlock)==0){
 				do{
 					// GDB doesn't see the *CqTail or *CqHead
 					// since it is mmap to be shared only with
 					// debug process and kernel so for debugging
 					// purposes it would be better load to local
-					// variables. Optimizer should load these these
+					// variables. Optimizer should load these
 					// to registers so it shouldn't matter. 
 					uint32_t head=atomic_load(CqHead);
 					uint32_t tail=atomic_load(CqTail);
@@ -293,7 +306,7 @@ static union{
 						struct io_uring_cqe *cqe;
 						unsigned index=head&(*CqMask);
 						cqe=Cqes+index;
-						if((int)cqe->res>=0) buffer->length+=(int)cqe->res;
+						if((int32_t)cqe->res>=0) buffer->length+=(int32_t)cqe->res;
 						else buffer->length=-1;
 						if(buffer->length<sizeof(buffer->buffers)/2) ready[cqe->user_data]=-1;
 						else ready[cqe->user_data]=1;
@@ -306,6 +319,7 @@ static union{
 				pthread_mutex_unlock(&testlock);
 			}
 			else{
+				// TODO: Read todo before mutex_trylock.
 				while(ready[sqeindex]==0);
 			}
 		}
@@ -349,15 +363,17 @@ static union{
 		// We check that state isn't last read.
 		// Special handle last read since we should
 		// worry about over reading.
+		int32_t index;
 		if(ready[buffer->constsqe->user_data]!=-1){
-			buffer->forwardhead=(buffer->forwardhead++)&(sizeof(buffer->buffers)-1);
-			if(buffer->forwardhead==sizeof(buffer->buffers)/2 || buffer->forwardhead==0){
+			if(buffer->forwardhead==sizeof(buffer->buffers)/2 || buffer->forwardhead==sizeof(buffer->buffers)){
 				changeIoBuffer(buffer);
 				if(buffer->length<=0) return 0;
 			}
+			index=buffer->forwardhead;
+			buffer->forwardhead=(++buffer->forwardhead)&(sizeof(buffer->buffers)-1);
 		}
-		else if(buffer->forwardhead++==buffer->length) return 0;
-		return buffer->buffers[buffer->forwardhead];
+		else if((index=buffer->forwardhead++)==buffer->length) return 0;
+		return buffer->buffers[index];
 		#pragma GCC diagnostic pop
 	}
 	/**********************
@@ -378,14 +394,14 @@ static union{
 			if(memcmp(buffer->buffers+buffer->forwardhead,str,length)==0){
 				// We are plussing one so that we are going to next letter.
 				if(length+1+(buffer->forwardhead&((sizeof(buffer->buffers)/2)-1))>=sizeof(buffer->buffers)/2){
-					// TODO: How to retport error??					
+					// TODO: How to retport error??
 					changeIoBuffer(buffer);
 					if(buffer->length<0) return 0;
 				}
 				buffer->forwardhead+=length+1;
 				buffer->forwardhead&=sizeof(buffer->buffers)-1;
 
-				// Check that there isn't more letters for identifier.
+				// Check that there isn't more letters for string.
 				if(!isAlNumUnder(checkByteIoBuffer(buffer))){
 					return 1;
 				}
@@ -416,10 +432,10 @@ static union{
 						// don't have to worry that over reading.
 						buffer->forwardhead+=length+1;
 					
-						// Check that there isn't more letter for identifier.
+						// Check that there isn't more letter for string.
 						if(!isAlNumUnder(checkByteIoBuffer(buffer))){
 							return 1;
-						}						
+						}
 					}
 				}
 				// We don't have more buffer to read?
@@ -431,34 +447,57 @@ static union{
 		}
 		return 0;
 	}
-	/**********************
-	* See BufferManager.h *
-	**********************/
-	uint8_t consumeIoBuffer(IoBuffer *buffer){
+	/**********************************************
+	* Send new buffer in if buffer point moved    *
+	* beyond buffer then send that buffer for     *
+	* reading.                                    *
+	**********************************************/
+	static void checkAndSendIoBuffer(IoBuffer *buffer){
 		// Check should we read new buffer.
 		// Member buffpoint is used to ask which buffer will be done
 		// and member forwardhead is used to tell are which buffer really done with.
+		// else return statement means we state inside of a buffer.
 		if(buffer->buffpoint<(sizeof(buffer->buffers)/2) && buffer->forwardhead>=(sizeof(buffer->buffers)/2)){
 			buffer->vec.iov_base=buffer->buffers+sizeof(buffer->buffers)/2;
 		}
 		else if(buffer->buffpoint>=(sizeof(buffer->buffers)/2) && buffer->forwardhead<(sizeof(buffer->buffers)/2)){
 			buffer->vec.iov_base=buffer->buffers;
 		}
-		else goto jmp_FAST_EXIT;
-		
+		else return;
+		// We did move beyong buffer so send it for reading.
 		sendIoBuffer(buffer);
-		
-		// Jump is used to when no new buffer isn't needed read.
-		jmp_FAST_EXIT:
+	}
+	/**********************
+	* See BufferManager.h *
+	**********************/
+	uint8_t consumeIoBuffer(IoBuffer *buffer){
+		checkAndSendIoBuffer(buffer);
+		// Just move bufferpoint to forwardhead as that
+		// is how much we read.
 		buffer->buffpoint=buffer->forwardhead;
 		return 0;
 	}
 	/**********************
 	* See BufferManager.h *
 	**********************/
-	uint8_t consumeCpyIoBuffer(IoBuffer *restrict buffer,uint8_t *str){
+	uint8_t consumeCpyIoBuffer(IoBuffer *restrict buffer,uint8_t *restrict str){
+		// We have to copy what is the buffers to between bufferpoint and forwardhead.
+		// We can't just give pointer point to buffer as buffer are reused and having
+		// filed size buffer is too much memory usage. 
+		
+		checkAndSendIoBuffer(buffer);
+		buffer->buffpoint=buffer->forwardhead;
 		return 0;
 	}
+#elif LINUX_VERSION_CODE<KERNEL_VERSION(5,1,0)
+/**********************************************
+* Before linux version 5.1.0 only avaible     *
+* option for asynchronous IO was POSIX AIO    *
+* interface which is implemented by blocking  *
+* thread in GNU's c libary.                   *
+**********************************************/
+#error "There is no implementation for POSIX AIO BufferManager.c. DO IT!"
+
 #else
 /**********************************************
 * If asyncnorance read and writes aren't      *
@@ -472,6 +511,7 @@ static union{
 	* See BufferManager.h *
 	**********************/
 	int initIoBufferManager(uint32_t initialmemory,uint32_t numbuffers){
+		
 		return 0;
 	}
 	/**********************

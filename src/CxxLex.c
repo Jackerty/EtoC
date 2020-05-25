@@ -3,8 +3,10 @@
 ***************************************/
 #include<stdint.h>
 #include<stdlib.h>
+#include<ctype.h>
 #include"BufferManager.h"
 #include"CxxLex.h"
+#include"Etc.h"
 
 /****************************************************************
 * Constant array for ends of the keywords in C++. Maybe little  *
@@ -69,9 +71,10 @@ static const uint8_t EndStruct[]={'u','c','t'};
 			case CXX_TOKEN_PREPROCESS_LINE     : return "CXX_TOKEN_PREPROCESS_LINE";
 			case CXX_TOKEN_COMMENT_LINE        : return "CXX_TOKEN_COMMENT_LINE"; 
 			case CXX_TOKEN_COMMENT_BLOCK       : return "CXX_TOKEN_COMMENT_BLOCK";
-			case CXX_TOKEN_DECL                : return "CXX_TOKEN_DECL";
+			case CXX_TOKEN_IDENTIDIER          : return "CXX_TOKEN_IDENTIDIER";
 			case CXX_TOKEN_ROOT                : return "CXX_TOKEN_ROOT";
 			case CXX_TOKEN_STRUCT              : return "CXX_TOKEN_STRUCT";
+			default                            : return "unknown";
 		}
 	}
 	/****************
@@ -101,18 +104,18 @@ static const uint8_t EndStruct[]={'u','c','t'};
 			case '#':
 				// Loop through white-space.
 				while((byte=getIoBufferByte(buffer))==' ' && byte=='\t');
-				switch(getIoBufferByte(buffer)){
+				switch((byte=getIoBufferByte(buffer))){
 					// newline means empty
 					case '\n':
 						node->token=CXX_TOKEN_PREPROCESS_EMPTY;
-						break;
+						goto jmp_WAS_IDENTIFIER;
 					// Definition
 					case 'd':
 						node->token=CXX_TOKEN_PREPROCESS_DEFINTION;
-						break;
+						goto jmp_WAS_IDENTIFIER;
 					// Ether endif, else, or error
 					case 'e':
-						break;
+						goto jmp_WAS_IDENTIFIER;
 					// Ether include, if, or ifdef
 					case 'i':
 						if((byte=getIoBufferByte(buffer))=='f'){
@@ -134,10 +137,10 @@ static const uint8_t EndStruct[]={'u','c','t'};
 			case 's':
 				// Ether short, sizeof, static, static_assert, static_cast, struct,
 				//       switch, synchronized
-				switch(getIoBufferByte(buffer)){
+				switch((byte=getIoBufferByte(buffer))){
 					case 't':
 						// Ether static_assert, static_cast, or struct
-						if(getIoBufferByte(buffer)=='r'){
+						if((byte=getIoBufferByte(buffer))=='r'){
 							if(checkIoBufferStr(buffer,EndStruct,sizeof(EndStruct))==0) goto jmp_WAS_IDENTIFIER;
 							node->token=CXX_TOKEN_STRUCT;
 							break;
@@ -155,6 +158,12 @@ static const uint8_t EndStruct[]={'u','c','t'};
 			default:
 			jmp_WAS_IDENTIFIER:
 			node->token=CXX_TOKEN_IDENTIDIER;
+			while(byte>0 && isAlNumUnder(byte)) byte=getIoBufferByte(buffer);
+			if(byte==0) return CXX_MORE_INPUT_ERROR;
+			else{
+				consumeCpyIoBuffer(buffer,0);
+				return CXX_SYNTAX_SUCCESS;
+			}
 		}
 		consumeIoBuffer(buffer);
 		return CXX_SYNTAX_SUCCESS;
@@ -198,7 +207,7 @@ static const uint8_t EndStruct[]={'u','c','t'};
 					#pragma GCC diagnostic ignored "-Wswitch"
 
 					switch(temp1->token){
-					case CXX_TOKEN_DECL:
+					case CXX_TOKEN_IDENTIDIER:
 						break;
 					case CXX_TOKEN_COMMENT_BLOCK:
 						break;

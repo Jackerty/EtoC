@@ -16,6 +16,7 @@ typedef enum CxxSyntaxError{
 	CXX_SYNTAX_SUCCESS,
 	CXX_NO_MORE_INPUT,
 	CXX_SYNTAX_BUFFER_ERROR,
+	CXX_MORE_INPUT_ERROR
 }CxxSyntaxError;
 /****************************************
 * Syntax tree tokens.                   *
@@ -36,7 +37,7 @@ typedef enum SyntaxTreeToken{
 	CXX_TOKEN_COMMENT_LINE,
 	CXX_TOKEN_COMMENT_BLOCK,
 	CXX_TOKEN_STRUCT,
-	CXX_TOKEN_DECL,
+	CXX_TOKEN_IDENTIDIER,
 	CXX_TOKEN_ROOT
 }SyntaxTreeToken;
 /**************************************

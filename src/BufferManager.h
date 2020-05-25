@@ -86,7 +86,7 @@ uint8_t consumeIoBuffer(IoBuffer *buffer);
 * Consume the what was read with       *
 * returing the copy of it.             *
 ***************************************/
-uint8_t consumeCpyIoBuffer(IoBuffer *restrict buffer,uint8_t *str);
+uint8_t consumeCpyIoBuffer(IoBuffer *restrict buffer,uint8_t *restrict str);
 	/***************************************
 	* Set the file descriptor without      *
 	* knowing buffers insides.             *
