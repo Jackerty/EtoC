@@ -73,24 +73,30 @@ HashTable FileTable;
 		// Check that file exists by opening file descriptor.
 		int fd;
 		if((fd=open(file,O_RDONLY))>-1){
-			setIoBufferFd(buffer,fd);
-			posix_fadvise(fd,0,0,POSIX_FADV_SEQUENTIAL);
+			int genericerror;
+			if((genericerror=setIoBufferFd(buffer,fd))==0){
+				posix_fadvise(fd,0,0,POSIX_FADV_SEQUENTIAL);
 
-			// Call the generator.
-			CxxSyntaxTreeNode *trunk;
-			if(genCxxSyntaxTree(buffer,&trunk)!=CXX_SYNTAX_SUCCESS){
-				printconst(STDERR_FILENO,"Error in genCxxSyntaxTree!\n");
+				// Call the generator.
+				CxxSyntaxTreeNode *trunk;
+				if(genCxxSyntaxTree(buffer,&trunk)!=CXX_SYNTAX_SUCCESS){
+					printconst(STDERR_FILENO,"Error in genCxxSyntaxTree!\n");
+				}
+				// We are done reading the file so close
+				close(fd);
+
+				// Add next job to list.
+				;
+
+				//REMOVE ME!!!!!!!!
+				signalThreadTownToStop();
+				//REMOVE ME!!!!!!!!
 			}
-			// We are done reading the file so close
-			close(fd);
-
-			// Add next job to list.
-			;
-
-			//REMOVE ME!!!!!!!!
-			signalThreadTownToStop();
-			//REMOVE ME!!!!!!!!
-
+			else{
+				close(fd);
+				printconst(STDERR_FILENO,"Error in setIoBufferFd\n");
+				signalThreadTownToStop();
+			}
 		}
 		else{
 			// Note that strerror comes from read-only memory here!!
@@ -102,10 +108,10 @@ HashTable FileTable;
 			            ,errnostr,"\n"
 			            ,6
 			            ,strlen(file)
-								  ,28
-								  ,strlen(errnostr)
-								  ,1
-								  );
+			            ,28
+			            ,strlen(errnostr)
+			            ,1
+			            );
 			signalThreadTownToStop();
 		}
 
@@ -123,7 +129,10 @@ HashTable FileTable;
 	*******************************************/
 	int main(int argn,char **args){
 		//*** VARIABLES ***//
+		// How many treads will be created.
 		uint32_t threadnum=0;
+		// General error catcher.
+		int errorcatch;
 
 		//*** INITIALIZATION ***//
 		//**LOAD CONFIGURATION **//
@@ -184,7 +193,7 @@ HashTable FileTable;
 					// to 4096 since most harddisk have that as block size
 					// or something that divisions 4096.
 					IoBuffer *buffers;
-					if(initIoBufferManager(threadnum,&buffers)==0){
+					if((errorcatch=initIoBufferManager(threadnum,&buffers))==0){
 
 						// Initialize hash table keep track source files.
 						// filecount is doubled as initialize size of the
@@ -192,7 +201,7 @@ HashTable FileTable;
 						if(initHashTable(&FileTable,filecount*2)==0){
 						
 							//** START COMPILING THREADS **//
-							void *callerreturn=populateThreadTown((void**)buffers);
+							void *callerreturn=populateThreadTown((void*)buffers,sizeof(IoBuffer));
 							void **restofresults=burnThreadTown();
 
 							//*** HANDLE RETURN VALUES ***//
@@ -204,6 +213,8 @@ HashTable FileTable;
 						else printconst(STDERR_FILENO,"CxxMain.c | initHashTable | error!\n");
 						deinitIoBufferManager(buffers);
 					}
+					else if(errorcatch==EPERM) printconst(STDERR_FILENO,"CxxMain.c | IO buffer | error!\nNo access to IORING_SETUP_SQPOLL.\n");
+					else if(errorcatch==ENOMEM) printconst(STDERR_FILENO,"CxxMain.c | IO buffer | error!\nNo kernel resources?\n");
 					else printconst(STDERR_FILENO,"CxxMain.c | IO buffer | error!\n");
 				}
 				else{

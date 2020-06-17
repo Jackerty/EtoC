@@ -30,8 +30,13 @@ void buildThreadTown(uint32_t population);
 * Populate town with threads including       *
 * caller thread. This functions returns      *
 * result of caller worker return value.      *
+* Since byworkerinfo is void ** type         *
+* function does not know how long data       *
+* structure array it has given. Second       *
+* variable should be in bytes how long one   *
+* data structure is.                         *
 *********************************************/
-void *populateThreadTown(void **byworkerinfo);
+void *populateThreadTown(void *byworkerinfo,int stride);
 /*********************************************
 * Destroy Thread Town and all of the memory  *
 * remaining at the queue.                    *

@@ -64,7 +64,7 @@ uint32_t numberofwaiters;
 	* number waiters doesn't go up.        *
 	***************************************/
 	static void doEvacuation(){
-		while(numberofwaiters>2){
+		while(numberofwaiters>1){
 			pthread_cond_broadcast(&queuewaitcondition);
 			// Sleep after every broadcast to make sure
 			// other threads get processing time.
@@ -100,6 +100,7 @@ uint32_t numberofwaiters;
 				}
 				else{
 					printconst(STDERR_FILENO,"WARMING: Every thread is in conditionalally waiting!");
+					numberofwaiters--;
 					stop=1;
 					pthread_mutex_unlock(&queuemutex);
 					doEvacuation();
@@ -147,7 +148,7 @@ uint32_t numberofwaiters;
 	/*******************
 	* See ThreadTown.h *
 	*******************/
-	void *populateThreadTown(void **byworkerinfo){
+	void *populateThreadTown(void *byworkerinfo,int stride){
 
 		// Make sure that wokers aren't stopping!
 		stop=0;
@@ -155,12 +156,12 @@ uint32_t numberofwaiters;
 
 		// Note that current thread is calculate as member of the townpopulation.
 		for(uint32_t worker=0;worker<townpopulation-1;worker++){
-			if(pthread_create(&workers[worker],0,workFinder,byworkerinfo+worker)!=0){
+			if(pthread_create(&workers[worker],0,workFinder,byworkerinfo+(worker*stride))!=0){
 				return 0;
 			}
 		}
-
-		return workFinder(byworkerinfo+townpopulation-1);
+		
+		return workFinder(byworkerinfo+(townpopulation-1)*stride);
 
 	}
 	/*******************

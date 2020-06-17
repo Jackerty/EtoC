@@ -23,11 +23,16 @@
 #if LINUX_VERSION_CODE>=KERNEL_VERSION(5,1,0)
 typedef struct IoBuffer{
 	struct io_uring_sqe *constsqe;
+	struct iovec vec;
 	int32_t buffpoint;
 	int32_t forwardhead;
 	int32_t length;
+	//TODO: Change this as 4096 most like is pagesize
+	//      hence cache line length. Better performance
+	//      if only one cache line is changed rather then
+	//      offsetting so that two cache lines have tobe
+	//      invalided. Dynamicly allocate 2*4096.
 	uint8_t buffers[2*4096];
-	struct iovec vec;
 }IoBuffer;
 #else
 typedef struct IoBuffer{
@@ -87,13 +92,11 @@ uint8_t consumeIoBuffer(IoBuffer *buffer);
 * returing the copy of it.             *
 ***************************************/
 uint8_t consumeCpyIoBuffer(IoBuffer *restrict buffer,uint8_t *restrict str);
-	/***************************************
-	* Set the file descriptor without      *
-	* knowing buffers insides.             *
-	***************************************/
-	static inline void setIoBufferFd(IoBuffer *buffer,int fd){
-		buffer->constsqe->fd=fd;
-	}
+/***************************************
+* Set the file descriptor without      *
+* knowing buffers insides.             *
+***************************************/
+uint8_t setIoBufferFd(IoBuffer *buffer,int fd);
 	/***************************************
 	* Check next byte without moving       *
 	* reading head.                        *

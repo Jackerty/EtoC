@@ -72,6 +72,7 @@ static uint32_t *SqFlags;
 static uint32_t *CqHead;
 static uint32_t *CqTail;
 static uint32_t *CqMask;
+//TODO: Needed? Time of writting appears only in initIOBufferManager.
 static uint16_t numberOfBuffers;
 /**********************************************
 * Variable tells how many buffers are         *
@@ -104,13 +105,18 @@ static union{
 		// io_uring_queue_init.
 		struct io_uring_params param;
 		memset(&param,0,sizeof(param));
-		// If uid is zero a.k.a root we can use
-		// kernel side polling and not have
-		// to send submits constantly.
+		
+		// We can use kernel side polling
+		// and not have to send submits 
+		// constantly by IORING_SETUP_SQPOLL.
+		// This is behind root access because
+		// kernel thread is created.
+		// It also requires file registration.
 		Flag.bits.nosqpoll=(getuid()!=0);
 		if(!Flag.bits.nosqpoll){
 			param.flags=IORING_SETUP_SQPOLL;
 		}
+		
 		// We allocate ring size to be number of buffers simple because
 		// we give every buffer there own io_uring_sqe structure entry. 
 		// No need for allocating and deallocating io_uring_sqe structures.
@@ -140,51 +146,62 @@ static union{
 					SqeLength=param.sq_entries*sizeof(struct io_uring_sqe);
 					Sqe=mmap(0,SqeLength,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_POPULATE,IoUringFd,IORING_OFF_SQES);
 					if(Sqe!=MAP_FAILED){
-							
-							// Allocate buffers.
-							// TODO: Should this be allocated to cache line alignment by element
-							//       so that threads don't cause writebacks to other threads work?
-							*buffers=malloc(sizeof(IoBuffer)*numberofbuffers);
+						
+						// Allocate buffers.
+						// TODO: Should this be allocated to cache line alignment by element
+						//       so that threads don't cause writebacks to other threads work?
+						*buffers=malloc(sizeof(IoBuffer)*numberofbuffers);
+						if(buffers){
 							numberOfBuffers=numberofbuffers;
-							if(buffers){
+							
+							ready=malloc(sizeof(atomic_int_fast8_t)*numberofbuffers);
+							if(ready){
 								
-								ready=malloc(sizeof(atomic_int_fast8_t)*numberofbuffers);
-								if(ready){
+								// Initialize the buffers for reading.
+								// This way we avoid having to call 
+								// preporation for reading function or
+								// make so that every time we call for 
+								// read we have to prepare the structure.
+								for(uint16_t b=0;b<numberofbuffers;b++){
 									
-									// Initialize the buffers for reading.
-									// This way we avoid having to call 
-									// preporation for reading function or
-									// make so that every time we call for 
-									// read we have to prepare the structure.
-									for(uint16_t b=0;b<numberofbuffers;b++){
-										
-										(*buffers)[b].constsqe=Sqe+b;
-										(*buffers)[b].constsqe->opcode=IORING_OP_READV;
-										(*buffers)[b].constsqe->flags=0;
-										(*buffers)[b].constsqe->ioprio=0;
-										(*buffers)[b].constsqe->off=0;
-										(*buffers)[b].constsqe->addr=(uint64_t)&(*buffers)[b].vec;
-										(*buffers)[b].constsqe->len=1;
-										(*buffers)[b].constsqe->rw_flags=0;
-										(*buffers)[b].constsqe->user_data=b;
-										(*buffers)[b].constsqe->__pad2[0]=0;
-										(*buffers)[b].constsqe->__pad2[1]=0;
-										(*buffers)[b].constsqe->__pad2[2]=0;
-										(*buffers)[b].buffpoint=0;
-										(*buffers)[b].forwardhead=0;
-									}
-									
-									#if 0
-									// Get smaller power of two of the number.
-									expected=1;
-									while(expected<numberOfBuffers) expected<<=1;
-									expected>>=1;
-									#endif
+									(*buffers)[b].constsqe=Sqe+b;
+									(*buffers)[b].constsqe->opcode=IORING_OP_READ;
+									(*buffers)[b].constsqe->flags=IOSQE_FIXED_FILE;
+									(*buffers)[b].constsqe->ioprio=0;
+									(*buffers)[b].constsqe->off=0;
+									(*buffers)[b].constsqe->addr=(uint64_t)&(*buffers)[b].vec;
+									(*buffers)[b].constsqe->len=1;
+									(*buffers)[b].constsqe->rw_flags=0;
+									(*buffers)[b].constsqe->user_data=b;
+									(*buffers)[b].constsqe->fd=b;
+									(*buffers)[b].constsqe->__pad2[0]=0;
+									(*buffers)[b].constsqe->__pad2[1]=0;
+									(*buffers)[b].constsqe->__pad2[2]=0;
+									(*buffers)[b].buffpoint=0;
+									(*buffers)[b].forwardhead=0;
+								}
+								
+								// Give every buffer file registery.
+								// Initialize register array by -1 
+								// which is symbol for sparse.
+								int arg[numberofbuffers];
+								for(int i=0;i<numberofbuffers;i++){
+									arg[i]=-1;
+								}
+								if(ioUringRegister(IoUringFd,IORING_REGISTER_FILES,arg,numberofbuffers)==0){
 									return 0;
 								}
-								free(buffers);
+								errno=-errno;
 							}
-							munmap(Sqe,SqLength);
+							else{
+								//TODO: ERROR code for ready malloc failing? 
+							}
+							free(buffers);
+						}
+						else{
+							//TODO: ERROR code for ready malloc failing?
+						}
+						munmap(Sqe,SqLength);
 					}
 					munmap(Cq,CqLength);
 				}
@@ -283,31 +300,43 @@ static union{
 		// user_data is thread id basicly that we use offset to 
 		// right location in ready array.
 		volatile uint32_t sqeindex=buffer->constsqe->user_data;
+		volatile uint32_t head;
+		volatile uint32_t tail;
 		if(ready[sqeindex]==0){
 			// This mutex makes sure only one thread handles
 			// response queue. One that get's the lock will
-			// handle every single one it sees.
-			// TODO: Is there theoritically possible to get
+			// handle every single one it sees and unlocks
+			// if thread has found it's own response.
+			// TODO: Is there theoritically possibility to get
 			//       response so late that mutex lock should
 			//       check in the while loop other treads
 			//       are spinning. Or should we make this
 			//       more friendlier to multiple threads.
 			if(pthread_mutex_trylock(&testlock)==0){
+//				goto jmp_NO_SYNC;
 				do{
+//					sleep(1);
+//					{
+//						if(msync(Cq,CqLength,MS_SYNC)==-1){
+//							printf("%s\n",strerror(errno));
+//						}
+//					}
+//					jmp_NO_SYNC:
+					
 					// GDB doesn't see the *CqTail or *CqHead
 					// since it is mmap to be shared only with
 					// debug process and kernel so for debugging
 					// purposes it would be better load to local
 					// variables. Optimizer should load these
-					// to registers so it shouldn't matter. 
-					uint32_t head=atomic_load(CqHead);
-					uint32_t tail=atomic_load(CqTail);
+					// to registers so it shouldn't matter.
+					head=atomic_load(CqHead);
+					tail=atomic_load(CqTail);
 					while(head!=tail){
 						struct io_uring_cqe *cqe;
 						unsigned index=head&(*CqMask);
 						cqe=Cqes+index;
 						if((int32_t)cqe->res>=0) buffer->length+=(int32_t)cqe->res;
-						else buffer->length=-1;
+						else buffer->length=(int32_t)cqe->res;
 						if(buffer->length<sizeof(buffer->buffers)/2) ready[cqe->user_data]=-1;
 						else ready[cqe->user_data]=1;
 						head++;
@@ -488,6 +517,21 @@ static union{
 		checkAndSendIoBuffer(buffer);
 		buffer->buffpoint=buffer->forwardhead;
 		return 0;
+	}
+	/**********************
+	* See BufferManager.h *
+	**********************/
+	uint8_t setIoBufferFd(IoBuffer *buffer,int fd){
+		// How IORING_SETUP_SQPOLL needs file registration but it 
+		// has other internal benefits as well. According to io_uring.pdf
+		// file reference is queried per write/read so by file registering
+		// this query is done ones per file description change.
+		volatile uint32_t sqeindex=buffer->constsqe->user_data;
+		struct io_uring_files_update update={.offset=sqeindex,.resv=0,.fds=(__aligned_u64)&fd};
+		if(ioUringRegister(IoUringFd,IORING_REGISTER_FILES_UPDATE,&update,1)==0){
+			return 0;
+		}
+		else return errno;
 	}
 #elif LINUX_VERSION_CODE<KERNEL_VERSION(5,1,0)
 /**********************************************

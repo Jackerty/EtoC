@@ -217,7 +217,9 @@ static const uint8_t EndStruct[]={'u','c','t'};
 
 				}
 			}
-			else result=CXX_SYNTAX_BUFFER_ERROR;
+			else{
+				result=CXX_SYNTAX_BUFFER_ERROR;
+			}
 		}
 		else result=CXX_SYNTAX_BUFFER_ERROR;
 
