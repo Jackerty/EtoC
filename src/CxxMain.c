@@ -6,6 +6,11 @@
 #include<stdlib.h>
 #include<sys/stat.h>
 #include<errno.h>
+// Check if strerror_s and strerrorlen_s are defined.
+// If yes mark that you want them.
+#ifdef __STDC_LIB_EXT1__
+	#define __STDC_WANT_LIB_EXT1__ 1
+#endif
 #include<string.h>
 #include<ctype.h>
 #include"OpHand.h"
@@ -78,9 +83,10 @@ HashTable FileTable;
 				posix_fadvise(fd,0,0,POSIX_FADV_SEQUENTIAL);
 
 				// Call the generator.
+				// TODO: How to free syntax trees if error occurs?
 				CxxSyntaxTreeNode *trunk;
 				if(genCxxSyntaxTree(buffer,&trunk)!=CXX_SYNTAX_SUCCESS){
-					printconst(STDERR_FILENO,"Error in genCxxSyntaxTree!\n");
+					printconst(STDERR_FILENO,"CxxMain.c | Error in genCxxSyntaxTree!\n");
 				}
 				// We are done reading the file so close
 				close(fd);
@@ -88,30 +94,44 @@ HashTable FileTable;
 				// Add next job to list.
 				;
 
-				//REMOVE ME!!!!!!!!
+				//TODO: REMOVE ME!!!!!!!!
 				signalThreadTownToStop();
 				//REMOVE ME!!!!!!!!
 			}
 			else{
 				close(fd);
-				printconst(STDERR_FILENO,"Error in setIoBufferFd\n");
+				printconst(STDERR_FILENO,"CxxMain.c | Error in setIoBufferFd!\n");
 				signalThreadTownToStop();
 			}
 		}
 		else{
-			// Note that strerror comes from read-only memory here!!
-			char *errnostr=strerror(errno);
-			printStrCat5(STDOUT_FILENO
-			            ,"File \""
-			            ,file
-			            ,"\" access failed with errno: "
-			            ,errnostr,"\n"
-			            ,6
-			            ,strlen(file)
-			            ,28
-			            ,strlen(errnostr)
-			            ,1
-			            );
+			#ifdef __STDC_LIB_EXT1__
+				// Note that strerror comes from read-only memory here!!
+				printStrCat5(STDOUT_FILENO
+				            ,"File \""
+				            ,file
+				            ,"\" access failed with errno: "
+				            ,strerror(errno),"\n"
+				            ,6
+				            ,strlen(file)
+				            ,28
+				            ,strerrorlen_s(errno)
+				            ,1
+				            );
+			#else
+				char *errnostr=strerror(errno);
+				printStrCat5(STDOUT_FILENO
+				            ,"File \""
+				            ,file
+				            ,"\" access failed with errno: "
+				            ,errnostr,"\n"
+				            ,6
+				            ,strlen(file)
+				            ,28
+				            ,strlen(errnostr)
+				            ,1
+				            );
+			#endif
 			signalThreadTownToStop();
 		}
 
@@ -140,7 +160,7 @@ HashTable FileTable;
 		//       Use libconfig.
 
 		//** HANDLE ARGUMENTS **//
-    const Option argops[]={
+		const Option argops[]={
 			{"version",.variable.str=(char **)VERSION_OP_STRING,.value.v32=sizeof(VERSION_OP_STRING),'v',{0,1,OPHAND_PRINT}},
 			{"help"   ,.variable.str=(char **)USAGE            ,.value.v32=sizeof(USAGE)            ,'h',{0,1,OPHAND_PRINT}},
 			{"thread-count",.variable.p32=(int32_t*)&threadnum,.value.v32=0,'j',{1,0,OPHAND_VALUE}}

@@ -57,16 +57,20 @@
 		// Use rather then moduĺe for speed.
 		// Works only if table length is 0b000...11111.
 		uint32_t index=entry->hash&table->length;
-		HashEntry *bucket=table->buckets[index];
 
 		// Just add to beging of the bucket pointer
 		// and if there was already something at
 		// the bucket increment collision.
-		if(bucket){
-			entry->next=bucket;
+		// TODO: Improve this!
+		if(table->buckets[index]){
+			HashEntry *ite=table->buckets[index];
+			while(ite->next) ite=ite->next;
+			ite->next=entry;
 			table->collision++;
 		}
-		bucket=entry;
+		else{
+			table->buckets[index]=entry;
+		}
 	}
 	/*************************************
 	* Resize the hashmap.                *
@@ -84,7 +88,7 @@
 		// new one. Use calloc to allocate since we need
 		// zero initialized area.
 		HashEntry **oldbuckets=table->buckets;
-		int32_t oldlength=table->length+1;		
+		int32_t oldlength=table->length+1;
 		// This operation "doubles" the size of the table.
 		// We have to add one since length is in minus one format
 		// meaning that to get true length you should add one.
@@ -93,8 +97,8 @@
 
 		// Go through all the hashmap entries and use entries' hash member
 		// to recalculate modulo with out rehashing. 
-		for(int32_t i=oldlength;i>=0;i++){	
-			HashEntry *ite=oldbuckets[i];			
+		for(int32_t i=oldlength;i>=0;i++){
+			HashEntry *ite=oldbuckets[i];
 			while(ite){
 				addToBucket(table,ite);
 				
@@ -151,7 +155,7 @@
 	* See Hash.h *
 	*************/
 	void destroyHashTable(HashTable *table){
-		for(int32_t i=table->length;i>=0;i--){
+		for(int32_t i=table->length-1;i>=0;i--){
 			HashEntry *freestruct1=table->buckets[i];
 			HashEntry *freestruct2;
 
@@ -316,37 +320,37 @@
 			const uint8_t  *k8;
 
 			while(length>12){
-		    a += k[0] + (((uint32_t)k[1])<<16);
-		    b += k[2] + (((uint32_t)k[3])<<16);
-		    c += k[4] + (((uint32_t)k[5])<<16);
-		    mix(a,b,c);
-		    length -= 12;
-		    k += 6;
-		  }
+				a += k[0] + (((uint32_t)k[1])<<16);
+				b += k[2] + (((uint32_t)k[3])<<16);
+				c += k[4] + (((uint32_t)k[5])<<16);
+				mix(a,b,c);
+				length -= 12;
+				k += 6;
+			}
 
-		  k8 = (const uint8_t *)k;
-		  switch(length){
-		  case 12:
+			k8 = (const uint8_t *)k;
+			switch(length){
+			case 12:
 				c+=k[4]+(((uint32_t)k[5])<<16);
 				b+=k[2]+(((uint32_t)k[3])<<16);
 				a+=k[0]+(((uint32_t)k[1])<<16);
 				break;
-		  case 11:
+			case 11:
 				c+=((uint32_t)k8[10])<<16;
 				/* fall through */
-		  case 10:
+			case 10:
 				c+=k[4];
 				b+=k[2]+(((uint32_t)k[3])<<16);
 				a+=k[0]+(((uint32_t)k[1])<<16);
 				break;
-		  case 9:
+			case 9:
 				c+=k8[8];
 				/* fall through */
-		  case 8:
+			case 8:
 				b+=k[2]+(((uint32_t)k[3])<<16);
 				a+=k[0]+(((uint32_t)k[1])<<16);
 				break;
-		  case 7:
+			case 7:
 				b+=((uint32_t)k8[6])<<16;
 				/* fall through */
 		  case 6:

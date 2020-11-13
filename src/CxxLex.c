@@ -146,20 +146,25 @@ static const uint8_t EndStruct[]={'u','c','t'};
 							break;
 						}
 						goto jmp_WAS_IDENTIFIER;
+					case EOT:
+						return CXX_READING_ERROR;
 				}
 				goto jmp_WAS_IDENTIFIER;
-			// No more input.
 			case 0:
+				return CXX_READING_ERROR;
+			// No more input.
+			case EOT:
 				return CXX_NO_MORE_INPUT;
 			// Default here means identifier not a keyword.
 			// We have jmp in it so that if we have 
 			// identifier that starts with keywords (or 
 			// lookalike) we can jump in.
 			default:
+			byte=getIoBufferByte(buffer);
 			jmp_WAS_IDENTIFIER:
 			node->token=CXX_TOKEN_IDENTIDIER;
 			while(byte>0 && isAlNumUnder(byte)) byte=getIoBufferByte(buffer);
-			if(byte==0) return CXX_MORE_INPUT_ERROR;
+			if(byte==EOT) return CXX_MORE_INPUT_ERROR;
 			else{
 				consumeCpyIoBuffer(buffer,0);
 				return CXX_SYNTAX_SUCCESS;
@@ -195,34 +200,37 @@ static const uint8_t EndStruct[]={'u','c','t'};
 			// Use this variable to move along tree.
 			CxxSyntaxTreeNode *iternode=*trunk;
 			CxxSyntaxTreeNode *temp1=allocCxxNode();
-			// Make sure that fullread has been done in kernel side.
-			waitResponseIoBuffer(buffer);
-			if(buffer->length>0){
-				while(getCxxToken(buffer,temp1)==CXX_SYNTAX_SUCCESS){
+			while((result=getCxxToken(buffer,temp1))==CXX_SYNTAX_SUCCESS){
+				//TODO: REMOVE DEBUG!!!!!!!!!
+				printf("%s\n",getTokenStr(temp1->token));
 				
-					printf("%s\n",getTokenStr(temp1->token));
-					// We will disable case warning not all enumeration have
-					// case. This to keep gcc output be less cluttered.
-					#pragma GCC diagnostic push
-					#pragma GCC diagnostic ignored "-Wswitch"
+				// We will disable case warning not all enumeration have
+				// case. This to keep gcc output be less cluttered.
+				#pragma GCC diagnostic push
+				#pragma GCC diagnostic ignored "-Wswitch"
 
-					switch(temp1->token){
-					case CXX_TOKEN_IDENTIDIER:
-						break;
-					case CXX_TOKEN_COMMENT_BLOCK:
-						break;
-					}
-
-					#pragma GCC diagnostic pop
-
+				switch(temp1->token){
+				case CXX_TOKEN_IDENTIDIER:
+					break;
+				case CXX_TOKEN_COMMENT_BLOCK:
+					break;
 				}
+
+				#pragma GCC diagnostic pop
+
 			}
-			else{
-				result=CXX_SYNTAX_BUFFER_ERROR;
+			if(CXX_NO_MORE_INPUT){
+				result=CXX_SYNTAX_SUCCESS;
 			}
+			
+			//TODO: REMOVE US!
+			// THESE ARE HERE TO MAKE VALGRIND HAPPY!
+			freeCxxSyntaxTree(*trunk);
+			freeCxxSyntaxTree(temp1);
+			// REMOVE US!
 		}
 		else result=CXX_SYNTAX_BUFFER_ERROR;
-
+		
 		return result;
 	}
 	/****************

@@ -27,10 +27,23 @@ pthread_t *workers;
 ***************************************/
 uint32_t townpopulation;
 
-#if defined(THREAD_TOWN_ONE_MUTEX) || 1
+#if defined(THREAD_TOWN_RING)
+/**********************************************
+* This implementation uses array for queues.  *
+* Two rings; one for jobs one for free job    *
+* forms.                                      *
+* TODO: What happens if there isn't enough    *
+*       job slots? realloc?                   *
+**********************************************/
+
+#elif defined(THREAD_TOWN_ONE_MUTEX) || 1
 /**********************************************
 * This implementation is tradional one mutex  *
 * that is locked when poping or pushing.      *
+* TODO: Isn't using memory well as frees done *
+*       jobs rather then having free pile.    *
+*       Maybe there is better implementation  * 
+*       thought.... without linked list....   *
 **********************************************/
 
 /***************************************
@@ -122,6 +135,9 @@ uint32_t numberofwaiters;
 			// Execute the job
 			//TODO: Returns void*!!!
 			currentjob->func(currentjob->param,workerinfo);
+			
+			//TODO: Implement free pile!
+			free(currentjob);
 		}
 		return 0;
 	}

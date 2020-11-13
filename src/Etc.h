@@ -7,12 +7,12 @@
 #define _ETC_H_
 
 	/******************************************
-	* This function checks is given byte in   *
-	* ascii a underscre, number, or latin     *
+	* This function checks is given byte a    *
+	* ascii, underscre, number, or latin      *
 	* letter.                                 *
 	******************************************/
 	static inline uint8_t isAlNumUnder(uint8_t byte){
-		if(byte=='_' || (byte<='0' && byte>='9') || (byte<='a' && byte>='z') || (byte<='A' && byte>='Z')) return 1;
+		if(byte=='_' || (byte>='0' && byte<='9') || (byte>='a' && byte<='z') || (byte>='A' && byte<='Z')) return 1;
 		else return 0;
 	}
 

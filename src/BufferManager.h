@@ -16,6 +16,13 @@
 #endif /* __linux__ */
 
 /***************************************
+* Macro for End Of Transmission.       *
+* EOT is given out when is no more     *
+* reading is done.                     *
+***************************************/
+#define EOT 4
+
+/***************************************
 * Data structure to keep information   *
 * about buffers there length and       *
 * state.                               *
@@ -23,16 +30,10 @@
 #if LINUX_VERSION_CODE>=KERNEL_VERSION(5,1,0)
 typedef struct IoBuffer{
 	struct io_uring_sqe *constsqe;
-	struct iovec vec;
+	uint8_t *buffers;
 	int32_t buffpoint;
 	int32_t forwardhead;
 	int32_t length;
-	//TODO: Change this as 4096 most like is pagesize
-	//      hence cache line length. Better performance
-	//      if only one cache line is changed rather then
-	//      offsetting so that two cache lines have tobe
-	//      invalided. Dynamicly allocate 2*4096.
-	uint8_t buffers[2*4096];
 }IoBuffer;
 #else
 typedef struct IoBuffer{
@@ -43,8 +44,9 @@ typedef struct IoBuffer{
 
 /***************************************
 * Initialize the buffer manager.       *
+* Returns zero on success.             *
 ***************************************/
-int initIoBufferManager(uint16_t numberofbuffers,IoBuffer **buffers);
+int initIoBufferManager(int16_t numberofbuffers,IoBuffer **buffers);
 /***************************************
 * Deallocate any memory associated     *
 * with BufferManager.                  *
@@ -61,10 +63,11 @@ int prepIoBufferForRead(IoBuffer *buff);
 ***************************************/
 int prepIoBufferForWrite(IoBuffer *buff);
 /***************************************
-* Read buffer to the full. This        *
+* Read buffers to the full. This       *
 * function is ment to be called before *
 * asking bytes or string checking as   *
-* initialization call.                 *
+* initialization call per buffer.      *
+* Function waits first read returns.   *
 ***************************************/
 int fullReadIoBuffer(IoBuffer *buffer);
 /***************************************
@@ -103,7 +106,7 @@ uint8_t setIoBufferFd(IoBuffer *buffer,int fd);
 	***************************************/
 	static inline uint8_t checkByteIoBuffer(const IoBuffer *buffer){
 		// We just need to give byte at index forwardhead since
-		// other functions move head to next byte.		
+		// other functions move the head to next byte.
 		return buffer->buffers[buffer->forwardhead];
 	}
 

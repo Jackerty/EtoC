@@ -42,7 +42,7 @@ $(O)/%.o:$(S)/%.c | $(O)
 	$(CC) -c $(CFLAGS) -o$@ $<
 
 $(O):
-	mkdir $(O)
+	mkdir -p $(O)
 
 clean:
 	rm -r $(O)

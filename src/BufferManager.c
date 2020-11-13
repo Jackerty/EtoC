@@ -51,7 +51,21 @@
 	static inline int ioUringEnter(int fd,unsigned int numsubmit,unsigned int mincompl,unsigned int flags,sigset_t *sig){ 
 		// Last parameter has something to do with signals.
 		return syscall(__NR_io_uring_enter,fd,numsubmit,mincompl,flags,sig,_NSIG/8);
-	} 
+	}
+/**********************************************
+* Constant IO buffer sizes value. Can be      *
+* changed from out side of the file by macro. *
+* Is signed integer sinze IO gives back -1 if *
+* error occurs so we are just considend.      *
+* Default 4096 should caver most modern hard  *
+* drives?                                     *
+**********************************************/
+#ifdef BUFFER_MANAFER_IO_BUFFER_SIZE
+	const int32_t bufferManagerBufferSize=BUFFER_MANAFER_IO_BUFFER_SIZE;
+#else
+	const int32_t bufferManagerBufferSize=4096;
+#endif
+
 /**********************************************
 * File descriptor of io_uring and uring       *
 * parameters.                                 *
@@ -73,7 +87,7 @@ static uint32_t *CqHead;
 static uint32_t *CqTail;
 static uint32_t *CqMask;
 //TODO: Needed? Time of writting appears only in initIOBufferManager.
-static uint16_t numberOfBuffers;
+static int16_t numberOfBuffers;
 /**********************************************
 * Variable tells how many buffers are         *
 * submited at ones to when ioUringEnter is    *
@@ -83,9 +97,13 @@ static uint16_t numberOfBuffers;
 **********************************************/
 static uint32_t expected;
 /**********************************************
-* State array for each buffer.                *
+* State array for each buffer and macros for  *
+* naming those states.                        *
 **********************************************/
 static atomic_int_fast8_t *ready;
+#define READY_INFLIGHT 0
+#define READY_RECEIVED_BACK 1
+#define READY_NOMORE_ERROR -1
 /**********************************************
 * Flag bit do we use sqpolling.               *
 **********************************************/
@@ -99,7 +117,13 @@ static union{
 	/**********************
 	* See BufferManager.h *
 	**********************/
-	int initIoBufferManager(uint16_t numberofbuffers,IoBuffer **buffers){
+	int initIoBufferManager(int16_t numberofbuffers,IoBuffer **buffers){
+		
+		// Return value. Changed to indicate error.
+		// Functions called which may cause errno 
+		// are io_uring_setup, io_uring_register,
+		// and malloc.
+		int retuner=0;
 		
 		// First let's do equal job to liburing's
 		// io_uring_queue_init.
@@ -147,11 +171,9 @@ static union{
 					Sqe=mmap(0,SqeLength,PROT_READ|PROT_WRITE,MAP_SHARED|MAP_POPULATE,IoUringFd,IORING_OFF_SQES);
 					if(Sqe!=MAP_FAILED){
 						
-						// Allocate buffers.
-						// TODO: Should this be allocated to cache line alignment by element
-						//       so that threads don't cause writebacks to other threads work?
+						// Allocate buffers structures.
 						*buffers=malloc(sizeof(IoBuffer)*numberofbuffers);
-						if(buffers){
+						if(*buffers){
 							numberOfBuffers=numberofbuffers;
 							
 							ready=malloc(sizeof(atomic_int_fast8_t)*numberofbuffers);
@@ -162,44 +184,43 @@ static union{
 								// preporation for reading function or
 								// make so that every time we call for 
 								// read we have to prepare the structure.
-								for(uint16_t b=0;b<numberofbuffers;b++){
+								for(int16_t b=numberofbuffers-1;b>=0;b--){
 									
 									(*buffers)[b].constsqe=Sqe+b;
-									(*buffers)[b].constsqe->opcode=IORING_OP_READ;
 									(*buffers)[b].constsqe->flags=IOSQE_FIXED_FILE;
 									(*buffers)[b].constsqe->ioprio=0;
 									(*buffers)[b].constsqe->off=0;
-									(*buffers)[b].constsqe->addr=(uint64_t)&(*buffers)[b].vec;
-									(*buffers)[b].constsqe->len=1;
 									(*buffers)[b].constsqe->rw_flags=0;
-									(*buffers)[b].constsqe->user_data=b;
 									(*buffers)[b].constsqe->fd=b;
 									(*buffers)[b].constsqe->__pad2[0]=0;
 									(*buffers)[b].constsqe->__pad2[1]=0;
 									(*buffers)[b].constsqe->__pad2[2]=0;
 									(*buffers)[b].buffpoint=0;
 									(*buffers)[b].forwardhead=0;
+									(*buffers)[b].constsqe->len=bufferManagerBufferSize;
+									// Allocate the actual double buffer on it's own so
+									// that they can be cache aligned.
+									(*buffers)[b].buffers=malloc(2*bufferManagerBufferSize);
+									prepIoBufferForRead((*buffers)+b);
 								}
 								
 								// Give every buffer file registery.
 								// Initialize register array by -1 
 								// which is symbol for sparse.
 								int arg[numberofbuffers];
-								for(int i=0;i<numberofbuffers;i++){
-									arg[i]=-1;
-								}
+								for(int16_t i=numberofbuffers;i>=0;i--) arg[i]=-1;
 								if(ioUringRegister(IoUringFd,IORING_REGISTER_FILES,arg,numberofbuffers)==0){
 									return 0;
 								}
-								errno=-errno;
+								retuner=-errno;
 							}
 							else{
-								//TODO: ERROR code for ready malloc failing? 
+								retuner=ECHILD;
 							}
 							free(buffers);
 						}
 						else{
-							//TODO: ERROR code for ready malloc failing?
+							retuner=E2BIG;
 						}
 						munmap(Sqe,SqLength);
 					}
@@ -209,14 +230,19 @@ static union{
 			}
 			close(IoUringFd);
 		}
-		return errno;
+		else retuner=errno;
+		return retuner;
 	}
 	/**********************
 	* See BufferManager.h *
 	**********************/
 	int deinitIoBufferManager(IoBuffer *buffers){
-		free(ready);
+		// Free dynamic allocations of members.
+		for(int16_t i=numberOfBuffers-1;i>=0;i--) free(buffers[i].buffers);
+		// Free buffers array.
 		free(buffers);
+		// Free module's globals.
+		free(ready);
 		munmap(Sq,SqeLength);
 		munmap(Cq,CqLength);
 		munmap(Sq,SqLength);
@@ -227,24 +253,14 @@ static union{
 	* See BufferManager.h *
 	**********************/
 	int prepIoBufferForRead(IoBuffer *buffer){
-		buffer->constsqe;
-		
-		
+		buffer->constsqe->opcode=IORING_OP_READ;
 		return 0;
 	}
 	/**********************
 	* See BufferManager.h *
 	**********************/
 	int prepIoBufferForWrite(IoBuffer *buffer){
-		buffer;
-		
-		
-		return 0;
-	}
-	/**********************
-	* See BufferManager.h *
-	**********************/
-	int freeIoBuffer(IoBuffer *buffer){
+		//TODO: HOW TO SWITCH TO WRITING?
 		return 0;
 	}
 	/**********************************************
@@ -260,7 +276,7 @@ static union{
 		volatile uint32_t sqeindex=(uint32_t)buffer->constsqe->user_data;
 		
 		// Set ready state to send.
-		ready[sqeindex]=0;
+		ready[sqeindex]=READY_INFLIGHT;
 		
 		// We have to somehow allocate tail index and move SqTails value.
 		// This should be done atomicly so that other thread doesn't allocte
@@ -302,7 +318,7 @@ static union{
 		volatile uint32_t sqeindex=buffer->constsqe->user_data;
 		volatile uint32_t head;
 		volatile uint32_t tail;
-		if(ready[sqeindex]==0){
+		if(ready[sqeindex]==READY_INFLIGHT){
 			// This mutex makes sure only one thread handles
 			// response queue. One that get's the lock will
 			// handle every single one it sees and unlocks
@@ -313,16 +329,7 @@ static union{
 			//       are spinning. Or should we make this
 			//       more friendlier to multiple threads.
 			if(pthread_mutex_trylock(&testlock)==0){
-//				goto jmp_NO_SYNC;
 				do{
-//					sleep(1);
-//					{
-//						if(msync(Cq,CqLength,MS_SYNC)==-1){
-//							printf("%s\n",strerror(errno));
-//						}
-//					}
-//					jmp_NO_SYNC:
-					
 					// GDB doesn't see the *CqTail or *CqHead
 					// since it is mmap to be shared only with
 					// debug process and kernel so for debugging
@@ -337,19 +344,25 @@ static union{
 						cqe=Cqes+index;
 						if((int32_t)cqe->res>=0) buffer->length+=(int32_t)cqe->res;
 						else buffer->length=(int32_t)cqe->res;
-						if(buffer->length<sizeof(buffer->buffers)/2) ready[cqe->user_data]=-1;
-						else ready[cqe->user_data]=1;
+						// Comparasion check that we didn't get back fully used buffer
+						// a.k.a file did not have more bytes to be read.
+						// We note that length may vary because fullReadIoBuffer read
+						// both buffers in one go.
+						if((buffer->length&(bufferManagerBufferSize-1))<bufferManagerBufferSize){
+							ready[cqe->user_data]=READY_NOMORE_ERROR;
+						}
+						else ready[cqe->user_data]=READY_RECEIVED_BACK;
 						head++;
 						atomic_store(CqHead,head);
 					}
 					// If our buffer isn't ready then we
 					// have to poll changes in the tail.
-				}while(ready[sqeindex]==0);
+				}while(ready[sqeindex]==READY_INFLIGHT);
 				pthread_mutex_unlock(&testlock);
 			}
 			else{
 				// TODO: Read todo before mutex_trylock.
-				while(ready[sqeindex]==0);
+				while(ready[sqeindex]==READY_INFLIGHT);
 			}
 		}
 	}
@@ -362,23 +375,22 @@ static union{
 	* buffer.                                     *
 	**********************************************/
 	static inline void changeIoBuffer(IoBuffer *buffer){
-		buffer->length-=sizeof(buffer->buffers)/2;
+		buffer->length-=bufferManagerBufferSize;
 		waitResponseIoBuffer(buffer);
 	}
 	/**********************
 	* See BufferManager.h *
 	**********************/
 	int fullReadIoBuffer(IoBuffer *buffer){
-		// For first read we can read both buffers
-		// Set iovec to longer.
-		buffer->vec.iov_base=buffer->buffers;
-		buffer->vec.iov_len=sizeof(buffer->buffers);
+		// First read first buffer. Wait for the response. 
+		buffer->constsqe->addr=(__u64)buffer->buffers;
 		// Set length of the read to zero.
 		// This is mostly so that old data is not left hanging.
 		buffer->length=0;
 		int result=sendIoBuffer(buffer);
-		// Now we have 
-		buffer->vec.iov_len=sizeof(buffer->buffers)/2;
+		
+		if(result>0);
+		
 		return result;
 	}
 	/**********************
@@ -389,20 +401,20 @@ static union{
 		// at the initIoBufferManager.
 		#pragma GCC diagnostic push
 		#pragma GCC diagnostic ignored "-Wsequence-point"
-		// We check that state isn't last read.
+		
+		// We check that character isn't last read.
 		// Special handle last read since we should
 		// worry about over reading.
-		int32_t index;
-		if(ready[buffer->constsqe->user_data]!=-1){
-			if(buffer->forwardhead==sizeof(buffer->buffers)/2 || buffer->forwardhead==sizeof(buffer->buffers)){
+		int8_t byte=buffer->buffers[buffer->forwardhead];
+		if(ready[buffer->constsqe->user_data]!=READY_NOMORE_ERROR){
+			buffer->forwardhead=(++buffer->forwardhead)&(bufferManagerBufferSize*2-1);
+			if(buffer->forwardhead==bufferManagerBufferSize || buffer->forwardhead==(bufferManagerBufferSize*2)){
 				changeIoBuffer(buffer);
-				if(buffer->length<=0) return 0;
+				if(buffer->length==0) return EOT;
+				else if(buffer->length<0) return 0;
 			}
-			index=buffer->forwardhead;
-			buffer->forwardhead=(++buffer->forwardhead)&(sizeof(buffer->buffers)-1);
 		}
-		else if((index=buffer->forwardhead++)==buffer->length) return 0;
-		return buffer->buffers[index];
+		return byte;
 		#pragma GCC diagnostic pop
 	}
 	/**********************
@@ -415,20 +427,20 @@ static union{
 		// We use and rather then modulos for speed since
 		// our buffer size is power 2.
 		//TODO: Should memcmp move forwardhead
-		//      amount that memcmp says there is
-		//      agreement when memcmp fails?
-		if(length+(buffer->forwardhead&((sizeof(buffer->buffers)/2)-1))<sizeof(buffer->buffers)/2){
+		//      amount that memcmp says so there
+		//      is agreement when memcmp fails?
+		if(length+(buffer->forwardhead&(bufferManagerBufferSize-1))<bufferManagerBufferSize){
 			// We can just compare since our string fit remainder
 			// of the buffer.
 			if(memcmp(buffer->buffers+buffer->forwardhead,str,length)==0){
 				// We are plussing one so that we are going to next letter.
-				if(length+1+(buffer->forwardhead&((sizeof(buffer->buffers)/2)-1))>=sizeof(buffer->buffers)/2){
-					// TODO: How to retport error??
+				if(length+1+(buffer->forwardhead&(bufferManagerBufferSize-1))>=bufferManagerBufferSize){
+					// TODO: How to report an error??
 					changeIoBuffer(buffer);
 					if(buffer->length<0) return 0;
 				}
 				buffer->forwardhead+=length+1;
-				buffer->forwardhead&=sizeof(buffer->buffers)-1;
+				buffer->forwardhead&=bufferManagerBufferSize*2-1;
 
 				// Check that there isn't more letters for string.
 				if(!isAlNumUnder(checkByteIoBuffer(buffer))){
@@ -440,7 +452,7 @@ static union{
 			// We have to read more then we have buffer.
 			// Check buffer amount first and then on second
 			// read check new buffer.
-			size_t remainder=sizeof(buffer->buffers)/2-buffer->forwardhead;
+			size_t remainder=bufferManagerBufferSize-buffer->forwardhead;
 			if(memcmp(buffer->buffers+buffer->forwardhead,str,remainder)==0){
 				// Buffer is used so make sure that new buffer is read.
 				// Then read variable rest amount of new buffer.
@@ -451,7 +463,7 @@ static union{
 					// size power of two we can use faster and 
 					// minus one modulus.
 					buffer->forwardhead+=remainder;
-					buffer->forwardhead&=sizeof(buffer->buffers)-1;
+					buffer->forwardhead&=bufferManagerBufferSize*2-1;
 					// Let's make rest variable so that we have easier
 					// time to compare middle of the string.
 					const size_t rest=length-remainder;
@@ -481,16 +493,17 @@ static union{
 	* beyond buffer then send that buffer for     *
 	* reading.                                    *
 	**********************************************/
-	static void checkAndSendIoBuffer(IoBuffer *buffer){
+	static void switchAndSendIoBuffer(IoBuffer *buffer){
+		//TODO: ENGLISH! DO YOU SPEAK IT!
 		// Check should we read new buffer.
-		// Member buffpoint is used to ask which buffer will be done
-		// and member forwardhead is used to tell are which buffer really done with.
+		// Member buffpoint is used to ask which buffer is be done
+		// and member forwardhead is used to tell which buffer really done with.
 		// else return statement means we state inside of a buffer.
-		if(buffer->buffpoint<(sizeof(buffer->buffers)/2) && buffer->forwardhead>=(sizeof(buffer->buffers)/2)){
-			buffer->vec.iov_base=buffer->buffers+sizeof(buffer->buffers)/2;
+		if(buffer->buffpoint<bufferManagerBufferSize && buffer->forwardhead>=bufferManagerBufferSize){
+			buffer->constsqe->addr=(__u64)buffer->buffers+bufferManagerBufferSize;
 		}
-		else if(buffer->buffpoint>=(sizeof(buffer->buffers)/2) && buffer->forwardhead<(sizeof(buffer->buffers)/2)){
-			buffer->vec.iov_base=buffer->buffers;
+		else if(buffer->buffpoint>=bufferManagerBufferSize && buffer->forwardhead<bufferManagerBufferSize){
+			buffer->constsqe->addr=(__u64)buffer->buffers;
 		}
 		else return;
 		// We did move beyong buffer so send it for reading.
@@ -500,7 +513,7 @@ static union{
 	* See BufferManager.h *
 	**********************/
 	uint8_t consumeIoBuffer(IoBuffer *buffer){
-		checkAndSendIoBuffer(buffer);
+		switchAndSendIoBuffer(buffer);
 		// Just move bufferpoint to forwardhead as that
 		// is how much we read.
 		buffer->buffpoint=buffer->forwardhead;
@@ -514,7 +527,7 @@ static union{
 		// We can't just give pointer point to buffer as buffer are reused and having
 		// filed size buffer is too much memory usage. 
 		
-		checkAndSendIoBuffer(buffer);
+		switchAndSendIoBuffer(buffer);
 		buffer->buffpoint=buffer->forwardhead;
 		return 0;
 	}
@@ -545,7 +558,7 @@ static union{
 #else
 /**********************************************
 * If asyncnorance read and writes aren't      *
-* avaible on system compiled then this else   *
+* avaible on system then this else will be    *
 * will be implementation done by blocking     *
 * reads.                                      *
 **********************************************/

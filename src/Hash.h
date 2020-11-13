@@ -37,7 +37,7 @@
 #define HASH_TABLE_ENTRY_HEADER \
 	struct HashEntry *next; \
 	char *key; \
-	uint32_t hash;
+	uint32_t hash
 
 /******************************************************
 * Hash table entry header.                            *
@@ -45,9 +45,7 @@
 * after this structure.                               *
 ******************************************************/
 typedef struct HashEntry{
-	struct HashEntry *next;
-	void *key;
-	uint32_t hash;
+	HASH_TABLE_ENTRY_HEADER;
 }HashEntry;
 /******************************************************
 * Hash table is array of linked listed entries of     *
