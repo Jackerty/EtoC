@@ -13,22 +13,25 @@
 *     struct HashEntry *next;                         *
 *     char *key;                                      *
 *     uint32_t hash;                                  *
-*     // VALUE KEY MAP TO                             *
+*     // VALUE KEY MAPPED TO                          *
 *     int value;                                      *
 *   }                                                 *
 *                                                     *
 * Important thing is there is header members are same *
 * offset in the structure when given to addition      *
-* addition function. Note that because last member of *                       
-* header is 32 bit long it means that you should      *
-* put 32 bit data before 64 bit data so that there    *
-* isn't 32 bits of padding try something more risque  *
-* like addressing to middle of the structure.         *
+* function. Note that because last member of header   *                       
+* is 32 bit long it means that you should put one 32  *
+* bit type before 64 bit data so that there isn't 32  *
+* bits of padding in 64 bit systems.                  *
 *                                                     *
 * You can also use HASH_TABLE_ENTRY_HEADER macro to   *
 * makes sure that needed members are there.           *
 ******************************************************/
+#ifndef _HASH_H_
+#define _HASH_H_
+
 #include<stdint.h>
+
 
 /******************************************************
 * Hash table entry header macro is to make programmer *
@@ -85,6 +88,9 @@ void destroyHashTable(HashTable *table);
 * http://burtleburtle.net/bob/c/lookup3.c             *
 *                                                     *
 * Function is combination of Little and big endian    *
-* functions that optimize for little and big endian.  *
+* functions that optimize for little and big endian   *
+* via macro check.                                    *
 ******************************************************/
 uint32_t hashBobJenkins(const void *key,uint32_t initval);
+
+#endif /* _HASH_H_ */
